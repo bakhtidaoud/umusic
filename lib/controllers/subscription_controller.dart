@@ -1,54 +1,41 @@
 import 'dart:async';
-import 'package:flutter/foundation.dart';
+import 'package:get/get.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/subscription.dart';
-import 'extraction_service.dart';
-import 'download_service.dart';
+import '../services/extraction_service.dart';
+import 'download_controller.dart';
 
-class SubscriptionService extends ChangeNotifier {
+class SubscriptionController extends GetxController {
   final SharedPreferences _prefs;
-  final ExtractionService _extractionService;
-  final DownloadService _downloadService;
 
-  List<Subscription> _subscriptions = [];
+  final RxList<Subscription> subscriptions = <Subscription>[].obs;
   Timer? _checkTimer;
-  bool _isChecking = false;
-  int _newDownloadsCount = 0;
+  var isChecking = false.obs;
+  var newDownloadsCount = 0.obs;
 
-  SubscriptionService(
-    this._prefs,
-    this._extractionService,
-    this._downloadService,
-  ) {
+  SubscriptionController(this._prefs) {
     _loadSubscriptions();
-    // Check every hour
     _checkTimer = Timer.periodic(
       const Duration(hours: 1),
       (timer) => checkNewContent(),
     );
   }
 
-  List<Subscription> get subscriptions => _subscriptions;
-  bool get isChecking => _isChecking;
-  int get newDownloadsCount => _newDownloadsCount;
-
   void _loadSubscriptions() {
     final List<String>? subsJson = _prefs.getStringList('subscriptions');
     if (subsJson != null) {
-      _subscriptions = subsJson.map((s) => Subscription.fromJson(s)).toList();
+      subscriptions.assignAll(subsJson.map((s) => Subscription.fromJson(s)));
     }
   }
 
   Future<void> _saveSubscriptions() async {
-    final List<String> subsJson = _subscriptions
-        .map((s) => s.toJson())
-        .toList();
+    final List<String> subsJson = subscriptions.map((s) => s.toJson()).toList();
     await _prefs.setStringList('subscriptions', subsJson);
-    notifyListeners();
   }
 
   Future<void> addSubscription(String url) async {
-    final metadata = await _extractionService.getMetadata(url);
+    final extractionService = Get.find<ExtractionService>();
+    final metadata = await extractionService.getMetadata(url);
     if (metadata == null) return;
 
     final sub = Subscription(
@@ -58,24 +45,26 @@ class SubscriptionService extends ChangeNotifier {
       knownVideoIds: metadata.entries.map((e) => e.url).toList(),
     );
 
-    _subscriptions.add(sub);
+    subscriptions.add(sub);
     await _saveSubscriptions();
   }
 
   Future<void> removeSubscription(String url) async {
-    _subscriptions.removeWhere((s) => s.url == url);
+    subscriptions.removeWhere((s) => s.url == url);
     await _saveSubscriptions();
   }
 
   Future<void> checkNewContent() async {
-    if (_isChecking) return;
-    _isChecking = true;
-    _newDownloadsCount = 0;
-    notifyListeners();
+    if (isChecking.value) return;
+    isChecking.value = true;
+    newDownloadsCount.value = 0;
 
-    for (int i = 0; i < _subscriptions.length; i++) {
-      final sub = _subscriptions[i];
-      final metadata = await _extractionService.getMetadata(sub.url);
+    final extractionService = Get.find<ExtractionService>();
+    final downloadController = Get.find<DownloadController>();
+
+    for (int i = 0; i < subscriptions.length; i++) {
+      final sub = subscriptions[i];
+      final metadata = await extractionService.getMetadata(sub.url);
 
       if (metadata != null) {
         final List<String> currentIds = metadata.entries
@@ -87,28 +76,27 @@ class SubscriptionService extends ChangeNotifier {
 
         if (newEntries.isNotEmpty) {
           if (sub.autoDownload) {
-            _downloadService.downloadBatch(newEntries);
-            _newDownloadsCount += newEntries.length;
+            downloadController.downloadBatch(newEntries);
+            newDownloadsCount.value += newEntries.length;
           }
 
-          _subscriptions[i] = sub.copyWith(
+          subscriptions[i] = sub.copyWith(
             lastChecked: DateTime.now(),
             knownVideoIds: currentIds,
           );
         } else {
-          _subscriptions[i] = sub.copyWith(lastChecked: DateTime.now());
+          subscriptions[i] = sub.copyWith(lastChecked: DateTime.now());
         }
       }
     }
 
-    _isChecking = false;
+    isChecking.value = false;
     await _saveSubscriptions();
-    notifyListeners();
   }
 
   @override
-  void dispose() {
+  void onClose() {
     _checkTimer?.cancel();
-    super.dispose();
+    super.onClose();
   }
 }

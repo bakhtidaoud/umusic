@@ -1,23 +1,24 @@
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
+import 'package:get/get.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as p;
 
-class CookieService extends ChangeNotifier {
-  static final CookieService _instance = CookieService._internal();
-  factory CookieService() => _instance;
-  CookieService._internal();
-
+class CookieController extends GetxController {
   final CookieManager _cookieManager = CookieManager.instance();
-  String? _cookieFilePath;
+  var cookieFilePath = RxnString();
+
+  @override
+  void onInit() {
+    super.onInit();
+    init();
+  }
 
   Future<void> init() async {
     final directory = await getApplicationSupportDirectory();
-    _cookieFilePath = p.join(directory.path, 'cookies.txt');
+    cookieFilePath.value = p.join(directory.path, 'cookies.txt');
   }
-
-  String? get cookieFilePath => _cookieFilePath;
 
   Future<void> extractAndSaveCookies(Uri url) async {
     try {
@@ -25,7 +26,6 @@ class CookieService extends ChangeNotifier {
       if (cookies.isEmpty) return;
 
       final buffer = StringBuffer();
-      // Netscape cookie file format (very simplified)
       for (var cookie in cookies) {
         final domain = cookie.domain ?? url.host;
         final name = cookie.name;
@@ -36,14 +36,12 @@ class CookieService extends ChangeNotifier {
             : 0;
         final secure = cookie.isSecure ?? false ? 'TRUE' : 'FALSE';
 
-        // Format: domain\tTRUE/FALSE\tpath\tTRUE/FALSE\texpiry\tname\tvalue
         buffer.writeln('$domain\tTRUE\t$path\t$secure\t$expiry\t$name\t$value');
       }
 
-      final file = File(_cookieFilePath!);
+      final file = File(cookieFilePath.value!);
       await file.writeAsString(buffer.toString());
-      debugPrint('Cookies saved to $_cookieFilePath');
-      notifyListeners();
+      debugPrint('Cookies saved to ${cookieFilePath.value}');
     } catch (e) {
       debugPrint('Error saving cookies: $e');
     }
@@ -57,12 +55,11 @@ class CookieService extends ChangeNotifier {
 
   Future<void> clearCookies() async {
     await _cookieManager.deleteAllCookies();
-    if (_cookieFilePath != null) {
-      final file = File(_cookieFilePath!);
+    if (cookieFilePath.value != null) {
+      final file = File(cookieFilePath.value!);
       if (await file.exists()) {
         await file.delete();
       }
     }
-    notifyListeners();
   }
 }

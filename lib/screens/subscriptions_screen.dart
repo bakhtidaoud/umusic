@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
+import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:intl/intl.dart';
-import '../services/subscription_service.dart';
+import '../controllers/subscription_controller.dart';
 import '../models/subscription.dart';
 
 class SubscriptionsScreen extends StatefulWidget {
@@ -18,66 +18,68 @@ class _SubscriptionsScreenState extends State<SubscriptionsScreen> {
 
   void _addSubscription() {
     if (_urlController.text.isEmpty) return;
-    context.read<SubscriptionService>().addSubscription(_urlController.text);
+    Get.find<SubscriptionController>().addSubscription(_urlController.text);
     _urlController.clear();
     Navigator.pop(context);
   }
 
   @override
   Widget build(BuildContext context) {
-    final subService = context.watch<SubscriptionService>();
+    final subController = Get.find<SubscriptionController>();
     final colorScheme = Theme.of(context).colorScheme;
 
-    return Column(
-      children: [
-        _buildActionHeader(context, subService),
-        if (subService.newDownloadsCount > 0)
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            child: Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(vertical: 12),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [colorScheme.primary, colorScheme.secondary],
+    return Obx(
+      () => Column(
+        children: [
+          _buildActionHeader(context, subController),
+          if (subController.newDownloadsCount.value > 0)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [colorScheme.primary, colorScheme.secondary],
+                  ),
+                  borderRadius: BorderRadius.circular(16),
                 ),
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: Text(
-                '🎉 Found ${subService.newDownloadsCount} new videos!',
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ).animate().shimmer(),
-          ),
-        Expanded(
-          child: subService.subscriptions.isEmpty
-              ? _buildEmptyState()
-              : AnimationLimiter(
-                  child: ListView.builder(
-                    padding: const EdgeInsets.all(16),
-                    itemCount: subService.subscriptions.length,
-                    itemBuilder: (context, index) {
-                      final sub = subService.subscriptions[index];
-                      return _buildSubscriptionCard(
-                        context,
-                        sub,
-                        subService,
-                      ).animate().fadeIn(delay: (index * 50).ms).slideX();
-                    },
+                child: Text(
+                  '🎉 Found ${subController.newDownloadsCount.value} new videos!',
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
                   ),
                 ),
-        ),
-      ],
+              ).animate().shimmer(),
+            ),
+          Expanded(
+            child: subController.subscriptions.isEmpty
+                ? _buildEmptyState()
+                : AnimationLimiter(
+                    child: ListView.builder(
+                      padding: const EdgeInsets.all(16),
+                      itemCount: subController.subscriptions.length,
+                      itemBuilder: (context, index) {
+                        final sub = subController.subscriptions[index];
+                        return _buildSubscriptionCard(
+                          context,
+                          sub,
+                          subController,
+                        ).animate().fadeIn(delay: (index * 50).ms).slideX();
+                      },
+                    ),
+                  ),
+          ),
+        ],
+      ),
     );
   }
 
   Widget _buildActionHeader(
     BuildContext context,
-    SubscriptionService subService,
+    SubscriptionController subController,
   ) {
     return Padding(
       padding: const EdgeInsets.all(16.0),
@@ -98,8 +100,8 @@ class _SubscriptionsScreenState extends State<SubscriptionsScreen> {
           ),
           const SizedBox(width: 12),
           IconButton.filledTonal(
-            onPressed: () => subService.checkNewContent(),
-            icon: subService.isChecking
+            onPressed: () => subController.checkNewContent(),
+            icon: subController.isChecking.value
                 ? const SizedBox(
                     width: 20,
                     height: 20,
@@ -135,7 +137,7 @@ class _SubscriptionsScreenState extends State<SubscriptionsScreen> {
   Widget _buildSubscriptionCard(
     BuildContext context,
     Subscription sub,
-    SubscriptionService service,
+    SubscriptionController controller,
   ) {
     final dateFormat = DateFormat('MMM dd, HH:mm');
     final colorScheme = Theme.of(context).colorScheme;
@@ -188,7 +190,7 @@ class _SubscriptionsScreenState extends State<SubscriptionsScreen> {
             Icons.delete_outline_rounded,
             color: Colors.redAccent,
           ),
-          onPressed: () => service.removeSubscription(sub.url),
+          onPressed: () => controller.removeSubscription(sub.url),
         ),
       ),
     );

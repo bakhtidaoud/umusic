@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:webview_flutter/webview_flutter.dart';
-import 'package:provider/provider.dart';
+import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
-import '../services/cookie_service.dart';
+import '../controllers/cookie_controller.dart';
 
 class BrowserScreen extends StatefulWidget {
   final String initialUrl;
@@ -34,11 +34,8 @@ class _BrowserScreenState extends State<BrowserScreen> {
           },
           onPageFinished: (url) async {
             setState(() => _isLoading = false);
-            final cookieService = Provider.of<CookieService>(
-              context,
-              listen: false,
-            );
-            await cookieService.extractAndSaveCookies(Uri.parse(url));
+            final cookieController = Get.find<CookieController>();
+            await cookieController.extractAndSaveCookies(Uri.parse(url));
           },
         ),
       )
@@ -138,16 +135,12 @@ class _BrowserScreenState extends State<BrowserScreen> {
             onPressed: () async {
               final url = await _controller.currentUrl();
               if (url != null) {
-                final cookieService = Provider.of<CookieService>(
-                  context,
-                  listen: false,
-                );
-                await cookieService.extractAndSaveCookies(Uri.parse(url));
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Cookies captured!'),
-                    behavior: SnackBarBehavior.floating,
-                  ),
+                final cookieController = Get.find<CookieController>();
+                await cookieController.extractAndSaveCookies(Uri.parse(url));
+                Get.snackbar(
+                  'Cookies Captured',
+                  'Cookies have been saved for the current site.',
+                  snackPosition: SnackPosition.BOTTOM,
                 );
               }
             },

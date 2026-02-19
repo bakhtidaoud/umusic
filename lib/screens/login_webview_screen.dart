@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
-import 'package:provider/provider.dart';
-import '../services/cookie_service.dart';
+import 'package:get/get.dart';
+import '../controllers/cookie_controller.dart';
 
 class LoginWebViewScreen extends StatefulWidget {
   final String initialUrl;
@@ -17,7 +17,7 @@ class _LoginWebViewScreenState extends State<LoginWebViewScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final cookieService = Provider.of<CookieService>(context, listen: false);
+    final cookieController = Get.find<CookieController>();
 
     return Scaffold(
       appBar: AppBar(
@@ -29,7 +29,7 @@ class _LoginWebViewScreenState extends State<LoginWebViewScreen> {
               if (_webViewController != null) {
                 final currentUrl = await _webViewController!.getUrl();
                 if (currentUrl != null) {
-                  await cookieService.extractAndSaveCookies(currentUrl);
+                  await cookieController.extractAndSaveCookies(currentUrl);
                   if (context.mounted) Navigator.pop(context);
                 }
               }
@@ -50,8 +50,7 @@ class _LoginWebViewScreenState extends State<LoginWebViewScreen> {
             onLoadStop: (controller, url) async {
               setState(() => _isLoading = false);
               if (url != null) {
-                // Periodically extract cookies on load stop
-                await cookieService.extractAndSaveCookies(url);
+                await cookieController.extractAndSaveCookies(url);
               }
             },
           ),

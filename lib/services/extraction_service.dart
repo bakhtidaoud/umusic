@@ -1,7 +1,8 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
+import 'package:get/get.dart';
 import 'package:youtube_explode_dart/youtube_explode_dart.dart';
-import 'native_service.dart';
+import '../services/native_service.dart';
 
 class YtDlpFormat {
   final String formatId;
@@ -88,30 +89,25 @@ class UniversalMetadata {
   });
 }
 
-class ExtractionService extends ChangeNotifier {
+class ExtractionService extends GetxController {
   YoutubeExplode _yt = YoutubeExplode();
   final Map<String, UniversalMetadata> _cache = {};
   String? _currentCookies;
+  String? _currentProxy;
 
   void setCookies(String? cookies) {
     if (_currentCookies == cookies) return;
     _currentCookies = cookies;
     _yt.close();
-
-    // For youtube_explode_dart, we'll use the default client for now
-    // as constructor injection varies by package version.
-    _yt = YoutubeExplode();
-    notifyListeners();
+    _yt =
+        YoutubeExplode(); // In newer versions, consider passing a custom client if needed
   }
-
-  String? _currentProxy;
 
   void setProxy(String? proxy) {
     if (_currentProxy == proxy) return;
     _currentProxy = proxy;
     _yt.close();
     _yt = YoutubeExplode();
-    notifyListeners();
   }
 
   Future<UniversalMetadata?> getMetadata(String url) async {
@@ -153,7 +149,6 @@ class ExtractionService extends ChangeNotifier {
       );
 
       _cache[url] = metadata;
-      notifyListeners();
       return metadata;
     } catch (e) {
       debugPrint('YouTube playlist extraction error: $e');
@@ -168,7 +163,6 @@ class ExtractionService extends ChangeNotifier {
 
       final formats = <YtDlpFormat>[];
 
-      // Combine muxed and separate streams into a unified format list
       for (var s in manifest.muxed) {
         formats.add(
           YtDlpFormat(
@@ -193,7 +187,6 @@ class ExtractionService extends ChangeNotifier {
       );
 
       _cache[url] = metadata;
-      notifyListeners();
       return metadata;
     } catch (e) {
       debugPrint('YouTube extraction error: $e');
@@ -210,7 +203,6 @@ class ExtractionService extends ChangeNotifier {
       ], proxy: _currentProxy);
       if (result == null || result.startsWith('Error')) return null;
 
-      // Use compute to parse large JSON strings in a separate isolate
       final metadata = await compute(_parseYtDlpOutput, {
         'output': result,
         'originalUrl': url,
@@ -218,7 +210,6 @@ class ExtractionService extends ChangeNotifier {
 
       if (metadata != null) {
         _cache[url] = metadata;
-        notifyListeners();
       }
       return metadata;
     } catch (e) {
@@ -228,13 +219,12 @@ class ExtractionService extends ChangeNotifier {
   }
 
   @override
-  void dispose() {
+  void onClose() {
     _yt.close();
-    super.dispose();
+    super.onClose();
   }
 }
 
-/// Top-level function for isolate-based parsing
 UniversalMetadata? _parseYtDlpOutput(Map<String, dynamic> params) {
   final String result = params['output'];
   final String url = params['originalUrl'];
@@ -242,7 +232,6 @@ UniversalMetadata? _parseYtDlpOutput(Map<String, dynamic> params) {
   try {
     final lines = result.trim().split('\n');
     if (lines.length > 1 || (jsonDecode(lines.first)['_type'] == 'playlist')) {
-      // Handle as playlist
       final firstData = jsonDecode(lines.first);
       final title =
           firstData['title'] ??
@@ -270,7 +259,6 @@ UniversalMetadata? _parseYtDlpOutput(Map<String, dynamic> params) {
         entries: entries,
       );
     } else {
-      // Single video
       final data = jsonDecode(lines.first);
       final rawFormats = data['formats'] as List? ?? [];
       final formats = rawFormats.map((f) => YtDlpFormat.fromJson(f)).toList();

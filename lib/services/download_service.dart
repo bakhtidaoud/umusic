@@ -1,9 +1,12 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:typed_data';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as p;
+import 'package:youtube_explode_dart/youtube_explode_dart.dart';
+import 'native_service.dart';
 
 enum DownloadStatus { pending, downloading, paused, completed, canceled, error }
 
@@ -17,6 +20,7 @@ class DownloadTask {
   int totalBytes;
   CancelToken? cancelToken;
   String? errorMessage;
+  final bool isYoutube;
 
   DownloadTask({
     required this.url,
@@ -28,6 +32,7 @@ class DownloadTask {
     this.totalBytes = -1,
     this.cancelToken,
     this.errorMessage,
+    this.isYoutube = false,
   });
 }
 
@@ -37,12 +42,64 @@ class DownloadService extends ChangeNotifier {
 
   Map<String, DownloadTask> get tasks => _tasks;
 
+  Future<void> runFFmpeg(List<String> args) async {
+    final result = await NativeService.runCommand('ffmpeg', args);
+    if (result != null && result.startsWith('Error')) {
+      debugPrint("FFmpeg error: $result");
+    }
+  }
+
+  Future<void> mergeFiles(
+    String videoPath,
+    String audioPath,
+    String outputPath,
+  ) async {
+    await runFFmpeg([
+      '-i',
+      videoPath,
+      '-i',
+      audioPath,
+      '-c',
+      'copy',
+      outputPath,
+    ]);
+  }
+
+  Future<void> startPlatformDownload(String url, String savePath) async {
+    final result = await NativeService.runCommand('yt-dlp', [
+      '-o',
+      savePath,
+      url,
+    ]);
+    if (result != null && result.startsWith('Error')) {
+      debugPrint("Platform download error: $result");
+    }
+  }
+
+  Future<void> downloadYoutubeStream(
+    StreamInfo streamInfo,
+    String fileName,
+  ) async {
+    final directory = await getApplicationDocumentsDirectory();
+    final savePath = p.join(directory.path, fileName);
+
+    final task = DownloadTask(
+      url: streamInfo.url.toString(),
+      fileName: fileName,
+      savePath: savePath,
+      cancelToken: CancelToken(),
+      isYoutube: true,
+    );
+
+    _tasks[task.url] = task;
+    notifyListeners();
+    await _startDownload(task);
+  }
+
   Future<void> downloadFile(String url, {String? fileName}) async {
     final name = fileName ?? p.basename(Uri.parse(url).path);
-    final directory =
-        await getApplicationDocumentsDirectory(); // Or getExternalStorageDirectory for Android
-    final dirPath = directory.path;
-    final savePath = p.join(dirPath, name);
+    final directory = await getApplicationDocumentsDirectory();
+    final savePath = p.join(directory.path, name);
 
     if (_tasks.containsKey(url) &&
         _tasks[url]!.status == DownloadStatus.downloading) {
@@ -113,7 +170,7 @@ class DownloadService extends ChangeNotifier {
       task.progress = 1.0;
       notifyListeners();
     } catch (e) {
-      if (CancelToken.isCancel(e as DioException)) {
+      if (e is DioException && CancelToken.isCancel(e)) {
         task.status = DownloadStatus.canceled;
       } else {
         task.status = DownloadStatus.error;
@@ -129,7 +186,7 @@ class DownloadService extends ChangeNotifier {
     if (task != null && task.status == DownloadStatus.downloading) {
       task.cancelToken?.cancel('paused');
       task.status = DownloadStatus.paused;
-      task.cancelToken = CancelToken(); // Prepare for resume
+      task.cancelToken = CancelToken();
       notifyListeners();
     }
   }

@@ -43,7 +43,7 @@ class YoutubeService extends ChangeNotifier {
       );
       final subtitles = captionManifest.tracks.toList();
 
-      final thumbnailsList = <Thumbnail>[
+      final thumbnailsList = <Thumbnail?>[
         video.thumbnails.lowResUrl.isNotEmpty
             ? Thumbnail(Uri.parse(video.thumbnails.lowResUrl), 120, 90)
             : null,
@@ -98,6 +98,16 @@ class YoutubeService extends ChangeNotifier {
       return metadata;
     } catch (e) {
       debugPrint('Error getting video info: $e');
+      return null;
+    }
+  }
+
+  Future<MuxedStreamInfo?> getBestMuxedStream(String videoId) async {
+    try {
+      final manifest = await _yt.videos.streamsClient.getManifest(videoId);
+      return manifest.muxed.withHighestBitrate();
+    } catch (e) {
+      debugPrint('Error getting muxed stream: $e');
       return null;
     }
   }

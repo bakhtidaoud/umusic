@@ -1,16 +1,79 @@
-# umusic
+<p align="center">
+  <img src="https://img.icons8.com/isometric/512/music.png" width="120" />
+</p>
 
-A new Flutter project.
+<h1 align="center">uMusic</h1>
 
-## Getting Started
+<p align="center">
+  <strong>A Premium Music Streaming & Download Experience Built with Flutter</strong>
+</p>
 
-This project is a starting point for a Flutter application.
+<p align="center">
+  <img src="https://img.shields.io/badge/Flutter-02569B?style=for-the-badge&logo=flutter&logoColor=white" />
+  <img src="https://img.shields.io/badge/Dart-0175C2?style=for-the-badge&logo=dart&logoColor=white" />
+  <img src="https://img.shields.io/badge/YouTube-FF0000?style=for-the-badge&logo=youtube&logoColor=white" />
+  <img src="https://img.shields.io/badge/Platform-Android%20|%20iOS%20|%20Windows-blue?style=for-the-badge" />
+</p>
 
-A few resources to get you started if this is your first Flutter project:
+---
 
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
+## ✨ Features
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+- 🎵 **High-Quality Streaming**: Enjoy crystal clear audio streaming directly from YouTube.
+- ⏬ **Powerful Downloader**: Download your favorite tracks and playlists for offline playback.
+- 📂 **Subscription Management**: Sync and manage your YouTube music subscriptions effortlessly.
+- 🌐 **In-App Browser**: integrated browser for easy music discovery.
+- 🎨 **Modern UI**: Sleek, animated interface powered by `flutter_animate` and Google Fonts.
+- 🖥️ **Desktop Integration**: Features a system tray icon for quick access on Windows.
+- 🔔 **Smart Notifications**: Stay updated with download progress and playback status.
+
+## 🚀 Tech Stack
+
+- **Framework:** [Flutter](https://flutter.dev)
+- **State Management:** [Provider](https://pub.dev/packages/provider)
+- **Networking:** [Dio](https://pub.dev/packages/dio)
+- **YouTube Integration:** [youtube_explode_dart](https://pub.dev/packages/youtube_explode_dart)
+- **WebView:** [flutter_inappwebview](https://pub.dev/packages/flutter_inappwebview)
+- **Animations:** [flutter_animate](https://pub.dev/packages/flutter_animate)
+- **Storage:** [shared_preferences](https://pub.dev/packages/shared_preferences) & [path_provider](https://pub.dev/packages/path_provider)
+
+## 🛠️ Getting Started
+
+### Prerequisites
+
+- Flutter SDK (v3.10.0 or higher)
+- Android Studio / VS Code
+- Git
+
+### Installation
+
+1. **Clone the repository**
+   ```bash
+   git clone https://github.com/yourusername/umusic.git
+   cd umusic
+   ```
+
+2. **Install dependencies**
+   ```bash
+   flutter pub get
+   ```
+
+3. **Run the application**
+   ```bash
+   flutter run
+   ```
+
+## 📸 Screenshots
+
+<p align="center">
+  <img src="https://via.placeholder.com/300x600?text=U+Music+Discovery" width="200" />
+  <img src="https://via.placeholder.com/300x600?text=Player+Screen" width="200" />
+  <img src="https://via.placeholder.com/300x600?text=Downloads" width="200" />
+</p>
+
+---
+
+<p align="center">
+  Made with ❤️ by the uMusic Team
+</p>
+

@@ -371,39 +371,18 @@ class DownloadService extends ChangeNotifier {
     try {
       final manifest = await _yt.videos.closedCaptions.getManifest(videoId);
       if (manifest.tracks.isNotEmpty) {
-        final track = manifest.tracks.first; // Default to first track
+        final track = manifest.tracks.first;
         final captions = await _yt.videos.closedCaptions.get(track);
-        final srtContent = _convertToSrt(captions);
+
+        // Move SRT conversion to an isolate
+        final srtContent = await compute(_convertToSrtIsolate, captions);
+
         final srtPath = '${p.withoutExtension(videoPath)}.srt';
         await File(srtPath).writeAsString(srtContent);
       }
     } catch (e) {
       debugPrint('Failed to download subtitles: $e');
     }
-  }
-
-  String _convertToSrt(ClosedCaptionTrack track) {
-    var buffer = StringBuffer();
-    for (var i = 0; i < track.captions.length; i++) {
-      final caption = track.captions[i];
-      buffer.writeln('${i + 1}');
-      buffer.writeln(
-        '${_formatDuration(caption.offset)} --> ${_formatDuration(caption.offset + caption.duration)}',
-      );
-      buffer.writeln(caption.text);
-      buffer.writeln();
-    }
-    return buffer.toString();
-  }
-
-  String _formatDuration(Duration d) {
-    String twoDigits(int n) => n.toString().padLeft(2, "0");
-    String threeDigits(int n) => n.toString().padLeft(3, "0");
-    final hours = twoDigits(d.inHours);
-    final minutes = twoDigits(d.inMinutes.remainder(60));
-    final seconds = twoDigits(d.inSeconds.remainder(60));
-    final milliseconds = threeDigits(d.inMilliseconds.remainder(1000));
-    return "$hours:$minutes:$seconds,$milliseconds";
   }
 
   void pauseDownload(String url) {
@@ -439,4 +418,29 @@ class DownloadService extends ChangeNotifier {
       NativeService.openFolder(task.savePath);
     }
   }
+}
+
+/// Top-level function for SRT conversion in isolate
+String _convertToSrtIsolate(ClosedCaptionTrack track) {
+  var buffer = StringBuffer();
+  for (var i = 0; i < track.captions.length; i++) {
+    final caption = track.captions[i];
+    buffer.writeln('${i + 1}');
+    buffer.writeln(
+      '${_formatDurationIsolate(caption.offset)} --> ${_formatDurationIsolate(caption.offset + caption.duration)}',
+    );
+    buffer.writeln(caption.text);
+    buffer.writeln();
+  }
+  return buffer.toString();
+}
+
+String _formatDurationIsolate(Duration d) {
+  String twoDigits(int n) => n.toString().padLeft(2, "0");
+  String threeDigits(int n) => n.toString().padLeft(3, "0");
+  final hours = twoDigits(d.inHours);
+  final minutes = twoDigits(d.inMinutes.remainder(60));
+  final seconds = twoDigits(d.inSeconds.remainder(60));
+  final milliseconds = threeDigits(d.inMilliseconds.remainder(1000));
+  return "$hours:$minutes:$seconds,$milliseconds";
 }

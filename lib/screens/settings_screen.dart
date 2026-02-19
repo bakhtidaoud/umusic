@@ -149,6 +149,56 @@ class SettingsScreen extends StatelessWidget {
               }
             },
           ),
+
+          _buildSectionHeader(context, 'Experimental'),
+          SwitchListTile(
+            title: const Text('Enable DRM Decryption Research'),
+            subtitle: const Text(
+              'EXPERIMENTAL: Widevine L3 decryption support.',
+            ),
+            value: config.enableExperimentalDRM,
+            onChanged: (val) {
+              if (val) {
+                _showDRMWarning(context, configService);
+              } else {
+                configService.updateConfig(
+                  config.copyWith(enableExperimentalDRM: false),
+                );
+              }
+            },
+          ),
+          if (config.enableExperimentalDRM)
+            Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.blue.withOpacity(0.05),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.blue.withOpacity(0.2)),
+                ),
+                child: const Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Research Notes:',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 12,
+                        color: Colors.blue,
+                      ),
+                    ),
+                    SizedBox(height: 4),
+                    Text(
+                      '• Widevine L3: Software-based, vulnerable to key extraction via intercepted CDMs.\n'
+                      '• Android: ExoPlayer MediaDrm can be used for session key acquisition.\n'
+                      '• Legal: Decryption may violate DMCA or regional copyright laws. For research only.',
+                      style: TextStyle(fontSize: 11, color: Colors.blueGrey),
+                    ),
+                  ],
+                ),
+              ),
+            ),
           const SizedBox(height: 40),
         ],
       ),
@@ -257,6 +307,36 @@ class SettingsScreen extends StatelessWidget {
           ),
           onChanged: onChanged,
         ),
+      ),
+    );
+  }
+
+  void _showDRMWarning(BuildContext context, ConfigService service) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('⚠️ Legal & Security Warning'),
+        content: const Text(
+          'Enabling DRM decryption is for educational and research purposes only.\n\n'
+          'Technically, this attempts to utilize CDM (Content Decryption Module) hooks or ExoPlayer DRM sessions to extract decryption keys. '
+          'Decrypting protected content may violate Terms of Service and local laws.\n\n'
+          'Proceed only if you understand the legal implications.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () {
+              service.updateConfig(
+                service.config.copyWith(enableExperimentalDRM: true),
+              );
+              Navigator.pop(context);
+            },
+            child: const Text('I Understand'),
+          ),
+        ],
       ),
     );
   }

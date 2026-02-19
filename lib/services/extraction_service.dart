@@ -10,6 +10,9 @@ class YtDlpFormat {
   final String? codec;
   final double? filesizeMb;
   final String? note;
+  final bool isHdr;
+  final bool is360;
+  final bool is3d;
 
   YtDlpFormat({
     required this.formatId,
@@ -18,18 +21,31 @@ class YtDlpFormat {
     this.codec,
     this.filesizeMb,
     this.note,
+    this.isHdr = false,
+    this.is360 = false,
+    this.is3d = false,
   });
 
   factory YtDlpFormat.fromJson(Map<String, dynamic> json) {
+    final note = json['format_note'] ?? '';
+    final dynamicRange = json['dynamic_range'] ?? '';
+
     return YtDlpFormat(
       formatId: json['format_id'] ?? '',
       ext: json['ext'] ?? '',
-      resolution: json['resolution'] ?? json['format_note'],
+      resolution: json['resolution'] ?? note,
       codec: json['vcodec'] != 'none' ? json['vcodec'] : json['acodec'],
       filesizeMb: (json['filesize'] != null)
           ? (json['filesize'] / 1024 / 1024)
           : null,
-      note: json['format_note'],
+      note: note,
+      isHdr:
+          dynamicRange.toString().contains('HDR') ||
+          note.toString().contains('HDR'),
+      is360:
+          note.toString().contains('360') ||
+          json['vcodec'].toString().contains('vp9.2'),
+      is3d: note.toString().contains('3D') || note.toString().contains('LR'),
     );
   }
 }
@@ -187,7 +203,6 @@ class ExtractionService extends ChangeNotifier {
 
   Future<UniversalMetadata?> _getYtDlpMetadata(String url) async {
     try {
-      // Get JSON metadata from yt-dlp. Use --flat-playlist to detect structure quickly.
       final result = await NativeService.runCommand('yt-dlp', [
         '-j',
         '--flat-playlist',
@@ -195,62 +210,17 @@ class ExtractionService extends ChangeNotifier {
       ], proxy: _currentProxy);
       if (result == null || result.startsWith('Error')) return null;
 
-      // yt-dlp -j with --flat-playlist gives multiple JSON objects if it's a result of a search or playlist
-      // But if it's a single URL, it might be one per line if it's a playlist.
-      final lines = result.trim().split('\n');
-      if (lines.length > 1 ||
-          (jsonDecode(lines.first)['_type'] == 'playlist')) {
-        // Handle as playlist
-        final firstData = jsonDecode(lines.first);
-        final title =
-            firstData['title'] ??
-            (firstData['_type'] == 'playlist'
-                ? firstData['playlist_title']
-                : 'Playlist');
+      // Use compute to parse large JSON strings in a separate isolate
+      final metadata = await compute(_parseYtDlpOutput, {
+        'output': result,
+        'originalUrl': url,
+      });
 
-        final entries = lines.map((line) {
-          final entryData = jsonDecode(line);
-          return PlaylistEntry(
-            title: entryData['title'] ?? 'Unknown',
-            url: entryData['url'] ?? entryData['webpage_url'] ?? url,
-            videoId: entryData['id'],
-          );
-        }).toList();
-
-        final metadata = UniversalMetadata(
-          title: title,
-          author: firstData['uploader'] ?? firstData['author'],
-          thumbnailUrl: firstData['thumbnail'],
-          formats: [],
-          originalUrl: url,
-          isYoutube: false,
-          isPlaylist: true,
-          entries: entries,
-        );
-
+      if (metadata != null) {
         _cache[url] = metadata;
         notifyListeners();
-        return metadata;
-      } else {
-        // Single video
-        final data = jsonDecode(lines.first);
-        final rawFormats = data['formats'] as List;
-        final formats = rawFormats.map((f) => YtDlpFormat.fromJson(f)).toList();
-
-        final metadata = UniversalMetadata(
-          title: data['title'] ?? 'Unknown Title',
-          author: data['uploader'] ?? data['author'],
-          thumbnailUrl: data['thumbnail'],
-          formats: formats,
-          originalUrl: url,
-          isYoutube: false,
-          videoId: data['id'],
-        );
-
-        _cache[url] = metadata;
-        notifyListeners();
-        return metadata;
       }
+      return metadata;
     } catch (e) {
       debugPrint('yt-dlp extraction error: $e');
       return null;
@@ -261,5 +231,62 @@ class ExtractionService extends ChangeNotifier {
   void dispose() {
     _yt.close();
     super.dispose();
+  }
+}
+
+/// Top-level function for isolate-based parsing
+UniversalMetadata? _parseYtDlpOutput(Map<String, dynamic> params) {
+  final String result = params['output'];
+  final String url = params['originalUrl'];
+
+  try {
+    final lines = result.trim().split('\n');
+    if (lines.length > 1 || (jsonDecode(lines.first)['_type'] == 'playlist')) {
+      // Handle as playlist
+      final firstData = jsonDecode(lines.first);
+      final title =
+          firstData['title'] ??
+          (firstData['_type'] == 'playlist'
+              ? firstData['playlist_title']
+              : 'Playlist');
+
+      final entries = lines.map((line) {
+        final entryData = jsonDecode(line);
+        return PlaylistEntry(
+          title: entryData['title'] ?? 'Unknown',
+          url: entryData['url'] ?? entryData['webpage_url'] ?? url,
+          videoId: entryData['id'],
+        );
+      }).toList();
+
+      return UniversalMetadata(
+        title: title,
+        author: firstData['uploader'] ?? firstData['author'],
+        thumbnailUrl: firstData['thumbnail'],
+        formats: [],
+        originalUrl: url,
+        isYoutube: false,
+        isPlaylist: true,
+        entries: entries,
+      );
+    } else {
+      // Single video
+      final data = jsonDecode(lines.first);
+      final rawFormats = data['formats'] as List? ?? [];
+      final formats = rawFormats.map((f) => YtDlpFormat.fromJson(f)).toList();
+
+      return UniversalMetadata(
+        title: data['title'] ?? 'Unknown Title',
+        author: data['uploader'] ?? data['author'],
+        thumbnailUrl: data['thumbnail'],
+        formats: formats,
+        originalUrl: url,
+        isYoutube: false,
+        videoId: data['id'],
+      );
+    }
+  } catch (e) {
+    debugPrint('Isolate parsing error: $e');
+    return null;
   }
 }

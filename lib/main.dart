@@ -451,8 +451,46 @@ class _MyHomePageState extends State<MyHomePage> {
                           .map(
                             (f) => DropdownMenuItem(
                               value: f,
-                              child: Text(
-                                '${f.resolution ?? f.ext} (${f.filesizeMb?.toStringAsFixed(1) ?? "?"} MB)',
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    '${f.resolution ?? f.ext} (${f.filesizeMb?.toStringAsFixed(1) ?? "?"} MB)',
+                                  ),
+                                  if (f.isHdr) ...[
+                                    const SizedBox(width: 4),
+                                    const Text(
+                                      '🔥HDR',
+                                      style: TextStyle(
+                                        color: Colors.orange,
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ],
+                                  if (f.is360) ...[
+                                    const SizedBox(width: 4),
+                                    const Text(
+                                      '🌐360°',
+                                      style: TextStyle(
+                                        color: Colors.blue,
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ],
+                                  if (f.is3d) ...[
+                                    const SizedBox(width: 4),
+                                    const Text(
+                                      '🕶️3D',
+                                      style: TextStyle(
+                                        color: Colors.purple,
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ],
+                                ],
                               ),
                             ),
                           )
@@ -464,6 +502,28 @@ class _MyHomePageState extends State<MyHomePage> {
                 ],
               ),
               const SizedBox(height: 12),
+              if (_selectedQuality?.isHdr ?? false)
+                Container(
+                  margin: const EdgeInsets.only(bottom: 12),
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.orange.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.orange.withOpacity(0.3)),
+                  ),
+                  child: const Row(
+                    children: [
+                      Icon(Icons.info_outline, size: 16, color: Colors.orange),
+                      SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'HDR recommended: Use VLC or MPC-HC for playback.',
+                          style: TextStyle(fontSize: 11, color: Colors.orange),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               Row(
                 children: [
                   Expanded(

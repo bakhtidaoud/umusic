@@ -17,6 +17,8 @@ class AppConfig {
   final String? lastFormatType;
   final String? lastQualityId;
 
+  final bool enableExperimentalDRM;
+
   AppConfig({
     this.downloadFolder,
     this.preferredQuality = 'Highest',
@@ -32,6 +34,7 @@ class AppConfig {
     this.smartModeEnabled = false,
     this.lastFormatType,
     this.lastQualityId,
+    this.enableExperimentalDRM = false,
   });
 
   AppConfig copyWith({
@@ -49,6 +52,7 @@ class AppConfig {
     bool? smartModeEnabled,
     String? lastFormatType,
     String? lastQualityId,
+    bool? enableExperimentalDRM,
   }) {
     return AppConfig(
       downloadFolder: downloadFolder ?? this.downloadFolder,
@@ -67,6 +71,8 @@ class AppConfig {
       smartModeEnabled: smartModeEnabled ?? this.smartModeEnabled,
       lastFormatType: lastFormatType ?? this.lastFormatType,
       lastQualityId: lastQualityId ?? this.lastQualityId,
+      enableExperimentalDRM:
+          enableExperimentalDRM ?? this.enableExperimentalDRM,
     );
   }
 
@@ -86,6 +92,7 @@ class AppConfig {
       'smartModeEnabled': smartModeEnabled,
       'lastFormatType': lastFormatType,
       'lastQualityId': lastQualityId,
+      'enableExperimentalDRM': enableExperimentalDRM,
     };
   }
 
@@ -105,6 +112,7 @@ class AppConfig {
       smartModeEnabled: map['smartModeEnabled'] ?? false,
       lastFormatType: map['lastFormatType'] as String?,
       lastQualityId: map['lastQualityId'] as String?,
+      enableExperimentalDRM: map['enableExperimentalDRM'] ?? false,
     );
   }
 

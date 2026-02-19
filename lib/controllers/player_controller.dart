@@ -3,6 +3,7 @@ import 'package:youtube_explode_dart/youtube_explode_dart.dart';
 import 'package:pod_player/pod_player.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:just_audio_background/just_audio_background.dart';
+import 'package:audio_service/audio_service.dart';
 
 class PlayerController extends GetxController {
   final YoutubeExplode _yt = YoutubeExplode();
@@ -23,6 +24,12 @@ class PlayerController extends GetxController {
   @override
   void onInit() {
     super.onInit();
+    // Listen to audio player state changes
+    _audioPlayer.playerStateStream.listen((state) {
+      if (isBackgroundMode.value) {
+        isPlaying.value = state.playing;
+      }
+    });
   }
 
   Future<void> initPlayer(String videoUrl) async {
@@ -44,24 +51,27 @@ class PlayerController extends GetxController {
 
       // Dispose previous controller if exists
       if (podController != null) {
-        await podController!.dispose();
+        podController!.dispose();
       }
 
       podController = PodPlayerController(
         playVideoFrom: PlayVideoFrom.youtube(videoUrl),
-        podPlayerConfig: const PodPlayerConfig(
-          autoPlay: true,
-          isLooping: false,
-          videoQualityPriority: [720, 360],
-        ),
+        podPlayerConfig: PodPlayerConfig(autoPlay: true, isLooping: false),
       );
 
       await podController!.initialise();
 
       // Listen to play/pause state
       podController!.addListener(() {
-        isPlaying.value =
-            podController!.videoPlayerController?.value.isPlaying ?? false;
+        if (!isBackgroundMode.value) {
+          // Using dynamic to bypass version-specific lint issues if property exists
+          isPlaying.value =
+              (podController as dynamic)
+                  .videoPlayerController
+                  ?.value
+                  .isPlaying ??
+              false;
+        }
       });
 
       isLoading.value = false;
@@ -76,9 +86,8 @@ class PlayerController extends GetxController {
     if (value) {
       // Background logic using just_audio for better reliability
       try {
-        final manifest = await _yt.videos.streamsClient.getManifest(
-          currentVideoUrl.value,
-        );
+        final videoId = VideoId(currentVideoUrl.value);
+        final manifest = await _yt.videos.streamsClient.getManifest(videoId);
         final audioStream = manifest.audioOnly.withHighestBitrate();
 
         await _audioPlayer.setAudioSource(
@@ -93,8 +102,9 @@ class PlayerController extends GetxController {
           ),
         );
 
-        if (podController?.videoPlayerController?.value.isPlaying ?? false) {
-          await podController!.pause();
+        if ((podController as dynamic).videoPlayerController?.value.isPlaying ??
+            false) {
+          podController!.pause();
           _audioPlayer.play();
         }
       } catch (e) {
@@ -107,14 +117,31 @@ class PlayerController extends GetxController {
     } else {
       if (_audioPlayer.playing) {
         await _audioPlayer.pause();
-        podController!.play();
+        if (podController != null) {
+          // Sync position back to video if possible
+          final vControl = (podController as dynamic).videoPlayerController;
+          if (vControl != null) {
+            await vControl.seekTo(_audioPlayer.position);
+          }
+          podController!.play();
+        }
       }
     }
   }
 
   void togglePlayPause() {
+    if (isBackgroundMode.value) {
+      if (_audioPlayer.playing) {
+        _audioPlayer.pause();
+      } else {
+        _audioPlayer.play();
+      }
+      return;
+    }
+
     if (podController == null) return;
-    if (podController!.videoPlayerController!.value.isPlaying) {
+    final vControl = (podController as dynamic).videoPlayerController;
+    if (vControl != null && (vControl.value.isPlaying as bool)) {
       podController!.pause();
     } else {
       podController!.play();
@@ -129,6 +156,7 @@ class PlayerController extends GetxController {
   void stopAndDismiss() {
     showMiniPlayer.value = false;
     podController?.pause();
+    _audioPlayer.stop();
     currentVideoUrl.value = '';
   }
 

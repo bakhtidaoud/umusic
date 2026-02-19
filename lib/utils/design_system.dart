@@ -95,13 +95,8 @@ class UDesign {
         primary: primary,
         secondary: secondary,
         surface: surface,
-        background: background,
       ),
-      cardTheme: CardThemeData(
-        color: surface,
-        shape: RoundedRectangleBorder(borderRadius: brMedium),
-        elevation: 0,
-      ),
+      // Removing problematic cardTheme to ensure cross-platform compatibility
     );
   }
 }

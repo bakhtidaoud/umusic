@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:system_tray/system_tray.dart';
+import 'package:just_audio_background/just_audio_background.dart';
 import 'dart:io';
 
 import 'services/native_service.dart';
@@ -13,6 +14,7 @@ import 'controllers/download_controller.dart';
 import 'controllers/subscription_controller.dart';
 import 'controllers/cookie_controller.dart';
 import 'controllers/library_controller.dart';
+import 'controllers/player_controller.dart';
 import 'screens/login_webview_screen.dart';
 import 'screens/settings_screen.dart';
 import 'screens/browser_screen.dart';
@@ -21,10 +23,19 @@ import 'screens/home_screen.dart';
 import 'screens/downloader_screen.dart';
 import 'screens/local_library_screen.dart';
 import 'widgets/custom_drawer.dart';
+import 'widgets/mini_player.dart';
 import 'utils/design_system.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Initialize Background Audio
+  await JustAudioBackground.init(
+    androidNotificationChannelId: 'com.ryanheise.bg_demo.channel.audio',
+    androidNotificationChannelName: 'Audio playback',
+    androidNotificationOngoing: true,
+  );
+
   final prefs = await SharedPreferences.getInstance();
 
   await NativeService.initializeBinaries();
@@ -40,6 +51,7 @@ void main() async {
   Get.put(SubscriptionController(prefs));
   Get.put(CookieController());
   Get.put(LibraryController());
+  Get.put(PlayerController()); // Global Player Controller
 
   runApp(const MyApp());
 }
@@ -209,16 +221,21 @@ class _MyHomePageState extends State<MyHomePage> {
           );
         },
       ),
-      body: PageView(
-        controller: _pageController,
-        physics: const NeverScrollableScrollPhysics(),
+      body: Stack(
         children: [
-          const HomeScreen(),
-          DownloaderScreen(initialUrl: _prefetchedUrl),
-          const LocalLibraryScreen(),
-          const SubscriptionsScreen(),
-          const BrowserScreen(),
-          const SettingsScreen(),
+          PageView(
+            controller: _pageController,
+            physics: const NeverScrollableScrollPhysics(),
+            children: [
+              const HomeScreen(),
+              DownloaderScreen(initialUrl: _prefetchedUrl),
+              const LocalLibraryScreen(),
+              const SubscriptionsScreen(),
+              const BrowserScreen(),
+              const SettingsScreen(),
+            ],
+          ),
+          const Positioned(left: 0, right: 0, bottom: 0, child: MiniPlayer()),
         ],
       ),
     );

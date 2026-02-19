@@ -5,7 +5,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import '../controllers/player_controller.dart';
 import '../utils/design_system.dart';
-import 'video_player_screen.dart';
+import '../screens/video_player_screen.dart';
 
 class MiniPlayer extends StatelessWidget {
   const MiniPlayer({super.key});

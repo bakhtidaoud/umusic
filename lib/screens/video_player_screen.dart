@@ -3,6 +3,7 @@ import 'package:get/get.dart';
 import 'package:pod_player/pod_player.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../controllers/player_controller.dart';
+import '../utils/design_system.dart';
 
 class VideoPlayerScreen extends StatefulWidget {
   final String videoUrl;
@@ -18,7 +19,8 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
   @override
   void initState() {
     super.initState();
-    controller = Get.put(PlayerController());
+    // Using find because it should be initialized globally or at least persist
+    controller = Get.find<PlayerController>();
     controller.initPlayer(widget.videoUrl);
   }
 
@@ -31,17 +33,32 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
         elevation: 0,
         leading: IconButton(
           icon: const Icon(
-            Icons.keyboard_arrow_down,
+            Icons.keyboard_arrow_down_rounded,
             color: Colors.white,
             size: 32,
           ),
-          onPressed: () => Get.back(),
+          onPressed: () => controller.minimize(),
         ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.more_vert_rounded, color: Colors.white),
+            onPressed: () {},
+          ),
+        ],
       ),
       body: Obx(() {
         if (controller.isLoading.value) {
           return const Center(
-            child: CircularProgressIndicator(color: Colors.white),
+            child: CircularProgressIndicator(color: UDesign.primary),
+          );
+        }
+
+        if (controller.podController == null) {
+          return const Center(
+            child: Text(
+              'Error loading player',
+              style: TextStyle(color: Colors.white),
+            ),
           );
         }
 
@@ -50,65 +67,142 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
           children: [
             AspectRatio(
               aspectRatio: 16 / 9,
-              child: PodVideoPlayer(controller: controller.podController),
+              child: PodVideoPlayer(
+                controller: controller.podController!,
+                podProgressBarConfig: const PodProgressBarConfig(
+                  padding: EdgeInsets.zero,
+                  playingBarColor: UDesign.primary,
+                  circleHandlerColor: UDesign.primary,
+                ),
+              ),
             ),
             Expanded(
               child: Container(
-                padding: const EdgeInsets.all(16),
-                decoration: const BoxDecoration(
-                  color: Color(0xFF0D0B14),
-                  borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+                padding: const EdgeInsets.all(24),
+                decoration: BoxDecoration(
+                  color: UDesign.background,
+                  borderRadius: const BorderRadius.vertical(
+                    top: Radius.circular(32),
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.5),
+                      blurRadius: 40,
+                      spreadRadius: 10,
+                    ),
+                  ],
                 ),
                 child: SingleChildScrollView(
+                  physics: const BouncingScrollPhysics(),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
                         controller.videoTitle.value,
                         style: GoogleFonts.outfit(
-                          fontSize: 20,
+                          fontSize: 22,
                           fontWeight: FontWeight.bold,
                           color: Colors.white,
+                          height: 1.2,
                         ),
                       ),
-                      const SizedBox(height: 8),
-                      Text(
-                        controller.channelName.value,
-                        style: GoogleFonts.outfit(
-                          fontSize: 14,
-                          color: Colors.white70,
-                        ),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 4,
+                            ),
+                            decoration: BoxDecoration(
+                              color: UDesign.primary.withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Text(
+                              controller.channelName.value,
+                              style: GoogleFonts.outfit(
+                                fontSize: 13,
+                                color: UDesign.primary,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                          const Spacer(),
+                          Text(
+                            'YouTube',
+                            style: GoogleFonts.outfit(
+                              color: Colors.white38,
+                              fontSize: 13,
+                            ),
+                          ),
+                        ],
                       ),
-                      const SizedBox(height: 24),
+                      const SizedBox(height: 32),
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceAround,
                         children: [
-                          _buildAction(Icons.thumb_up_outlined, 'Like'),
-                          _buildAction(Icons.share_outlined, 'Share'),
-                          _buildAction(Icons.download_outlined, 'Download'),
-                          _buildAction(Icons.playlist_add_outlined, 'Save'),
+                          _buildAction(Icons.thumb_up_rounded, 'Like'),
+                          _buildAction(Icons.share_rounded, 'Share'),
+                          _buildAction(Icons.download_rounded, 'Download'),
+                          _buildAction(Icons.playlist_add_rounded, 'Save'),
                         ],
                       ),
-                      const Divider(height: 48, color: Colors.white10),
-                      // Audio-only toggle or info could go here
-                      ListTile(
-                        leading: const CircleAvatar(
-                          backgroundColor: Colors.white10,
-                          child: Icon(Icons.music_note, color: Colors.white),
-                        ),
-                        title: Text(
-                          'Audio Only Mode',
-                          style: GoogleFonts.outfit(color: Colors.white),
-                        ),
-                        subtitle: Text(
-                          'Switch to background audio playback',
-                          style: GoogleFonts.outfit(
-                            color: Colors.white60,
-                            fontSize: 12,
+                      const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 32),
+                        child: Divider(color: Colors.white10),
+                      ),
+                      // Audio-only toggle
+                      UDesign.glassMaterial(
+                        borderRadius: UDesign.brMedium,
+                        child: Container(
+                          padding: const EdgeInsets.all(4),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.03),
+                            borderRadius: UDesign.brMedium,
+                            border: Border.all(
+                              color: Colors.white.withOpacity(0.05),
+                            ),
+                          ),
+                          child: ListTile(
+                            leading: Container(
+                              padding: const EdgeInsets.all(10),
+                              decoration: BoxDecoration(
+                                color: controller.isBackgroundMode.value
+                                    ? UDesign.primary.withOpacity(0.2)
+                                    : Colors.white.withOpacity(0.05),
+                                shape: BoxShape.circle,
+                              ),
+                              child: Icon(
+                                Icons.headset_rounded,
+                                color: controller.isBackgroundMode.value
+                                    ? UDesign.primary
+                                    : Colors.white60,
+                              ),
+                            ),
+                            title: Text(
+                              'Background Audio',
+                              style: GoogleFonts.outfit(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            subtitle: Text(
+                              'Play audio even when app is closed',
+                              style: GoogleFonts.outfit(
+                                color: Colors.white38,
+                                fontSize: 12,
+                              ),
+                            ),
+                            trailing: Switch(
+                              value: controller.isBackgroundMode.value,
+                              activeColor: UDesign.primary,
+                              onChanged: (v) =>
+                                  controller.toggleBackgroundMode(v),
+                            ),
                           ),
                         ),
-                        trailing: Switch(value: false, onChanged: (v) {}),
                       ),
+                      const SizedBox(height: 40),
                     ],
                   ),
                 ),
@@ -123,9 +217,23 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
   Widget _buildAction(IconData icon, String label) {
     return Column(
       children: [
-        Icon(icon, color: Colors.white, size: 24),
-        const SizedBox(height: 4),
-        Text(label, style: const TextStyle(color: Colors.white, fontSize: 12)),
+        Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: Colors.white.withOpacity(0.05),
+            shape: BoxShape.circle,
+          ),
+          child: Icon(icon, color: Colors.white, size: 22),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          label,
+          style: GoogleFonts.outfit(
+            color: Colors.white60,
+            fontSize: 12,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
       ],
     );
   }

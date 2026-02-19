@@ -1,26 +1,102 @@
 import 'package:get/get.dart';
 import 'package:youtube_explode_dart/youtube_explode_dart.dart';
 import 'package:flutter/material.dart';
+import 'package:dio/dio.dart' as dio;
+import 'dart:async';
 
 class HomeController extends GetxController {
   final YoutubeExplode _yt = YoutubeExplode();
+  final dio.Dio _dio = dio.Dio();
+
   var videos = <Video>[].obs;
+  var shorts = <Video>[].obs;
   var isLoading = true.obs;
   var currentQuery = 'trending music'.obs;
+  var currentCategory = 'All'.obs;
+
+  var suggestions = <String>[].obs;
+  var showSuggestions = false.obs;
+
   final TextEditingController searchController = TextEditingController();
+  Timer? _debounce;
+
+  final List<String> categories = [
+    'All',
+    'Music',
+    'Gaming',
+    'News',
+    'Movies',
+    'Live',
+    'Comedy',
+    'Technology',
+  ];
 
   @override
   void onInit() {
     super.onInit();
     fetchVideos();
+
+    searchController.addListener(_onSearchChanged);
   }
 
-  Future<void> fetchVideos({String? query}) async {
+  void _onSearchChanged() {
+    if (_debounce?.isActive ?? false) _debounce!.cancel();
+    _debounce = Timer(const Duration(milliseconds: 500), () {
+      fetchSuggestions(searchController.text);
+    });
+  }
+
+  Future<void> fetchSuggestions(String query) async {
+    if (query.isEmpty) {
+      suggestions.clear();
+      showSuggestions.value = false;
+      return;
+    }
+
+    try {
+      final response = await _dio.get(
+        'https://suggestqueries.google.com/complete/search?client=firefox&ds=yt&q=$query',
+      );
+      if (response.statusCode == 200) {
+        final List<dynamic> data = response.data[1];
+        suggestions.assignAll(data.map((e) => e.toString()).toList());
+        showSuggestions.value = suggestions.isNotEmpty;
+      }
+    } catch (e) {
+      debugPrint('Error fetching suggestions: $e');
+    }
+  }
+
+  Future<void> fetchVideos({String? query, String? category}) async {
     isLoading.value = true;
+    showSuggestions.value = false;
+
     try {
       if (query != null) currentQuery.value = query;
-      final result = await _yt.search.getVideos(currentQuery.value);
-      videos.assignAll(result.take(30));
+      if (category != null) currentCategory.value = category;
+
+      String finalQuery = currentQuery.value;
+      if (currentCategory.value != 'All') {
+        finalQuery = '${currentCategory.value} $finalQuery';
+      }
+
+      final result = await _yt.search.getVideos(finalQuery);
+
+      // Filter Shorts (roughly videos < 70 seconds or with "shorts" in metadata)
+      final allVids = result.toList();
+      final List<Video> filteredShorts = [];
+      final List<Video> filteredRegular = [];
+
+      for (var v in allVids) {
+        if (v.duration != null && v.duration!.inSeconds < 70) {
+          filteredShorts.add(v);
+        } else {
+          filteredRegular.add(v);
+        }
+      }
+
+      videos.assignAll(filteredRegular.take(20));
+      shorts.assignAll(filteredShorts.take(15));
     } catch (e) {
       Get.snackbar(
         'Error',
@@ -33,17 +109,20 @@ class HomeController extends GetxController {
   }
 
   void search(String query) {
-    if (query.isEmpty) {
-      fetchVideos(query: 'trending music');
-    } else {
-      fetchVideos(query: query);
-    }
+    searchController.text = query;
+    fetchVideos(query: query.isEmpty ? 'trending music' : query);
+  }
+
+  void setCategory(String category) {
+    if (currentCategory.value == category) return;
+    fetchVideos(category: category);
   }
 
   @override
   void onClose() {
     _yt.close();
     searchController.dispose();
+    _debounce?.cancel();
     super.onClose();
   }
 }

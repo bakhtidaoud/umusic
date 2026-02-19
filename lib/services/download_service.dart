@@ -7,6 +7,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as p;
 import 'package:youtube_explode_dart/youtube_explode_dart.dart';
 import 'native_service.dart';
+import 'extraction_service.dart';
 
 enum DownloadStatus { pending, downloading, paused, completed, canceled, error }
 
@@ -21,6 +22,9 @@ class DownloadTask {
   CancelToken? cancelToken;
   String? errorMessage;
   final bool isYoutube;
+  final bool downloadSubtitles;
+  final bool downloadThumbnail;
+  final String? videoId;
 
   DownloadTask({
     required this.url,
@@ -33,14 +37,26 @@ class DownloadTask {
     this.cancelToken,
     this.errorMessage,
     this.isYoutube = false,
+    this.downloadSubtitles = false,
+    this.downloadThumbnail = false,
+    this.videoId,
   });
 }
 
 class DownloadService extends ChangeNotifier {
   final Dio _dio = Dio();
   final Map<String, DownloadTask> _tasks = {};
+  final List<DownloadTask> _queue = [];
+  int _activeDownloads = 0;
+  int maxConcurrentDownloads = 3;
+  final YoutubeExplode _yt = YoutubeExplode();
 
   Map<String, DownloadTask> get tasks => _tasks;
+
+  void updateMaxConcurrent(int count) {
+    maxConcurrentDownloads = count;
+    _processQueue();
+  }
 
   Future<void> runFFmpeg(List<String> args) async {
     final result = await NativeService.runCommand('ffmpeg', args);
@@ -65,14 +81,37 @@ class DownloadService extends ChangeNotifier {
     ]);
   }
 
-  Future<void> startPlatformDownload(String url, String savePath) async {
-    final result = await NativeService.runCommand('yt-dlp', [
+  Future<void> startPlatformDownload(
+    String url,
+    String savePath, {
+    bool downloadSubtitles = false,
+    bool downloadThumbnail = false,
+  }) async {
+    final args = [
       '-o',
       savePath,
+      if (downloadSubtitles) ...[
+        '--write-subs',
+        '--write-auto-subs',
+        '--convert-subs',
+        'srt',
+      ],
+      if (downloadThumbnail) '--write-thumbnail',
       url,
-    ]);
+    ];
+    final result = await NativeService.runCommand('yt-dlp', args);
     if (result != null && result.startsWith('Error')) {
       debugPrint("Platform download error: $result");
+    }
+  }
+
+  Future<void> downloadBatch(List<PlaylistEntry> entries) async {
+    for (var entry in entries) {
+      if (entry.isSelected) {
+        // Here we just queue them. For now, we assume direct download for simplicity
+        // In a real app, you'd fetch the best format for each first.
+        downloadFile(entry.url, fileName: '${entry.title}.mp4');
+      }
     }
   }
 
@@ -83,6 +122,8 @@ class DownloadService extends ChangeNotifier {
     final directory = await getApplicationDocumentsDirectory();
     final savePath = p.join(directory.path, fileName);
 
+    if (_tasks.containsKey(streamInfo.url.toString())) return;
+
     final task = DownloadTask(
       url: streamInfo.url.toString(),
       fileName: fileName,
@@ -92,31 +133,62 @@ class DownloadService extends ChangeNotifier {
     );
 
     _tasks[task.url] = task;
+    _queue.add(task);
     notifyListeners();
-    await _startDownload(task);
+
+    _processQueue();
   }
 
-  Future<void> downloadFile(String url, {String? fileName}) async {
+  Future<void> downloadFile(
+    String url, {
+    String? fileName,
+    bool downloadSubtitles = false,
+    bool downloadThumbnail = false,
+    String? videoId,
+    bool isYoutube = false,
+  }) async {
     final name = fileName ?? p.basename(Uri.parse(url).path);
     final directory = await getApplicationDocumentsDirectory();
     final savePath = p.join(directory.path, name);
 
-    if (_tasks.containsKey(url) &&
-        _tasks[url]!.status == DownloadStatus.downloading) {
-      return;
-    }
+    if (_tasks.containsKey(url)) return;
 
     final task = DownloadTask(
       url: url,
       fileName: name,
       savePath: savePath,
       cancelToken: CancelToken(),
+      downloadSubtitles: downloadSubtitles,
+      downloadThumbnail: downloadThumbnail,
+      videoId: videoId,
+      isYoutube: isYoutube,
     );
 
     _tasks[url] = task;
+    _queue.add(task);
     notifyListeners();
 
-    await _startDownload(task);
+    _processQueue();
+  }
+
+  void _processQueue() {
+    while (_activeDownloads < maxConcurrentDownloads && _queue.isNotEmpty) {
+      final task = _queue.removeAt(0);
+      _activeDownloads++;
+      _startDownload(task)
+          .then((_) {
+            _activeDownloads--;
+            _processQueue();
+          })
+          .catchError((e) {
+            debugPrint('Error in _processQueue for task ${task.url}: $e');
+            task.status = DownloadStatus.error;
+            task.errorMessage = e.toString();
+            notifyListeners();
+            _activeDownloads--;
+            _processQueue();
+          });
+    }
   }
 
   Future<void> _startDownload(DownloadTask task) async {
@@ -124,6 +196,16 @@ class DownloadService extends ChangeNotifier {
       task.status = DownloadStatus.downloading;
       task.errorMessage = null;
       notifyListeners();
+
+      // Handle Thumbnail
+      if (task.downloadThumbnail && task.isYoutube && task.videoId != null) {
+        await _downloadYoutubeThumbnail(task.videoId!, task.savePath);
+      }
+
+      // Handle Subtitles for YouTube
+      if (task.downloadSubtitles && task.isYoutube && task.videoId != null) {
+        await _downloadYoutubeSubtitles(task.videoId!, task.savePath);
+      }
 
       File file = File(task.savePath);
       int existingLength = 0;
@@ -144,11 +226,9 @@ class DownloadService extends ChangeNotifier {
 
       final total =
           int.tryParse(response.headers.value('content-length') ?? '-1') ?? -1;
-      if (existingLength > 0 && total != -1) {
-        task.totalBytes = total + existingLength;
-      } else {
-        task.totalBytes = total;
-      }
+      task.totalBytes = (existingLength > 0 && total != -1)
+          ? total + existingLength
+          : total;
 
       final IOSink sink = file.openWrite(
         mode: existingLength > 0 ? FileMode.append : FileMode.write,
@@ -179,6 +259,61 @@ class DownloadService extends ChangeNotifier {
       }
       notifyListeners();
     }
+  }
+
+  Future<void> _downloadYoutubeThumbnail(
+    String videoId,
+    String videoPath,
+  ) async {
+    try {
+      final thumbUrl = 'https://img.youtube.com/vi/$videoId/maxresdefault.jpg';
+      final thumbPath = '${p.withoutExtension(videoPath)}.jpg';
+      await _dio.download(thumbUrl, thumbPath);
+    } catch (e) {
+      debugPrint('Failed to download thumbnail: $e');
+    }
+  }
+
+  Future<void> _downloadYoutubeSubtitles(
+    String videoId,
+    String videoPath,
+  ) async {
+    try {
+      final manifest = await _yt.videos.closedCaptions.getManifest(videoId);
+      if (manifest.tracks.isNotEmpty) {
+        final track = manifest.tracks.first; // Default to first track
+        final captions = await _yt.videos.closedCaptions.get(track);
+        final srtContent = _convertToSrt(captions);
+        final srtPath = '${p.withoutExtension(videoPath)}.srt';
+        await File(srtPath).writeAsString(srtContent);
+      }
+    } catch (e) {
+      debugPrint('Failed to download subtitles: $e');
+    }
+  }
+
+  String _convertToSrt(ClosedCaptionTrack track) {
+    var buffer = StringBuffer();
+    for (var i = 0; i < track.captions.length; i++) {
+      final caption = track.captions[i];
+      buffer.writeln('${i + 1}');
+      buffer.writeln(
+        '${_formatDuration(caption.offset)} --> ${_formatDuration(caption.offset + caption.duration)}',
+      );
+      buffer.writeln(caption.text);
+      buffer.writeln();
+    }
+    return buffer.toString();
+  }
+
+  String _formatDuration(Duration d) {
+    String twoDigits(int n) => n.toString().padLeft(2, "0");
+    String threeDigits(int n) => n.toString().padLeft(3, "0");
+    final hours = twoDigits(d.inHours);
+    final minutes = twoDigits(d.inMinutes.remainder(60));
+    final seconds = twoDigits(d.inSeconds.remainder(60));
+    final milliseconds = threeDigits(d.inMilliseconds.remainder(1000));
+    return "$hours:$minutes:$seconds,$milliseconds";
   }
 
   void pauseDownload(String url) {

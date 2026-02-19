@@ -56,6 +56,16 @@ class NativeService {
   }
 
   static Future<String?> runCommand(String command, List<String> args) async {
+    final cookieFile = File(
+      p.join((await getApplicationSupportDirectory()).path, 'cookies.txt'),
+    );
+    final List<String> finalArgs = List.from(args);
+
+    if (command == 'yt-dlp' && await cookieFile.exists()) {
+      finalArgs.insert(0, '--cookies');
+      finalArgs.insert(1, cookieFile.path);
+    }
+
     if (Platform.isAndroid || Platform.isIOS) {
       try {
         if (command == 'ffmpeg') {

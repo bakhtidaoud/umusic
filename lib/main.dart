@@ -11,6 +11,11 @@ import 'services/cookie_service.dart';
 import 'screens/login_webview_screen.dart';
 import 'screens/settings_screen.dart';
 import 'screens/browser_screen.dart';
+import 'screens/subscriptions_screen.dart';
+import 'services/subscription_service.dart';
+import 'package:flutter_animate/flutter_animate.dart';
+import 'package:system_tray/system_tray.dart';
+import 'dart:io';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -21,17 +26,46 @@ void main() async {
   final cookieService = CookieService();
   await cookieService.init();
 
+  if (Platform.isWindows || Platform.isMacOS || Platform.isLinux) {
+    await initSystemTray();
+  }
+
   runApp(
     MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (_) => ConfigService(prefs)),
         ChangeNotifierProvider(create: (_) => DownloadService()),
-        ChangeNotifierProvider(create: (_) => ExtractionService()),
+        ChangeNotifierProvider(create: (context) => ExtractionService()),
+        ProxyProvider2<ExtractionService, DownloadService, SubscriptionService>(
+          update: (context, extraction, download, previous) =>
+              previous ?? SubscriptionService(prefs, extraction, download),
+        ),
         ChangeNotifierProvider.value(value: cookieService),
       ],
       child: const MyApp(),
     ),
   );
+}
+
+Future<void> initSystemTray() async {
+  final SystemTray systemTray = SystemTray();
+  await systemTray.initSystemTray(
+    title: "uMusic",
+    iconPath: Platform.isWindows
+        ? 'assets/app_icon.ico'
+        : 'assets/app_icon.png',
+  );
+
+  final Menu menu = Menu();
+  await menu.buildFrom([
+    MenuItemLabel(
+      label: 'Show App',
+      onClicked: (menuItem) => AppWindow().show(),
+    ),
+    MenuItemLabel(label: 'Exit', onClicked: (menuItem) => exit(0)),
+  ]);
+
+  await systemTray.setContextMenu(menu);
 }
 
 class MyApp extends StatelessWidget {
@@ -52,6 +86,14 @@ class MyApp extends StatelessWidget {
           brightness: Brightness.light,
         ),
         useMaterial3: true,
+        pageTransitionsTheme: const PageTransitionsTheme(
+          builders: {
+            TargetPlatform.android: ZoomPageTransitionsBuilder(),
+            TargetPlatform.iOS: CupertinoPageTransitionsBuilder(),
+            TargetPlatform.windows: ZoomPageTransitionsBuilder(),
+            TargetPlatform.macOS: ZoomPageTransitionsBuilder(),
+          },
+        ),
       ),
       darkTheme: ThemeData(
         colorScheme: ColorScheme.fromSeed(
@@ -59,6 +101,14 @@ class MyApp extends StatelessWidget {
           brightness: Brightness.dark,
         ),
         useMaterial3: true,
+        pageTransitionsTheme: const PageTransitionsTheme(
+          builders: {
+            TargetPlatform.android: ZoomPageTransitionsBuilder(),
+            TargetPlatform.iOS: CupertinoPageTransitionsBuilder(),
+            TargetPlatform.windows: ZoomPageTransitionsBuilder(),
+            TargetPlatform.macOS: ZoomPageTransitionsBuilder(),
+          },
+        ),
       ),
       home: const MyHomePage(title: 'uMusic'),
     );
@@ -208,6 +258,28 @@ class _MyHomePageState extends State<MyHomePage> {
             color: configService.config.smartModeEnabled ? Colors.amber : null,
             onPressed: () => configService.setSmartMode(
               !configService.config.smartModeEnabled,
+            ),
+          ),
+          IconButton(
+            icon: Icon(
+              configService.config.themeMode == 'dark'
+                  ? Icons.light_mode
+                  : Icons.dark_mode,
+            ),
+            tooltip: 'Toggle Theme',
+            onPressed: () {
+              final newMode = configService.config.themeMode == 'dark'
+                  ? 'light'
+                  : 'dark';
+              configService.setThemeMode(newMode);
+            },
+          ),
+          IconButton(
+            icon: const Icon(Icons.subscriptions),
+            tooltip: 'Subscriptions',
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const SubscriptionsScreen()),
             ),
           ),
           IconButton(
@@ -651,7 +723,7 @@ class DownloadItem extends StatelessWidget {
           ],
         ),
       ),
-    );
+    ).animate().fadeIn(duration: 400.ms).slideX(begin: 0.1, end: 0);
   }
 
   String _getStatusText() {

@@ -55,26 +55,36 @@ class NativeService {
     }
   }
 
-  static Future<String?> runCommand(String command, List<String> args) async {
+  static Future<String?> runCommand(
+    String command,
+    List<String> args, {
+    String? proxy,
+  }) async {
     final cookieFile = File(
       p.join((await getApplicationSupportDirectory()).path, 'cookies.txt'),
     );
     final List<String> finalArgs = List.from(args);
 
-    if (command == 'yt-dlp' && await cookieFile.exists()) {
-      finalArgs.insert(0, '--cookies');
-      finalArgs.insert(1, cookieFile.path);
+    if (command == 'yt-dlp') {
+      if (await cookieFile.exists()) {
+        finalArgs.insert(0, '--cookies');
+        finalArgs.insert(1, cookieFile.path);
+      }
+      if (proxy != null && proxy.isNotEmpty) {
+        finalArgs.insert(0, '--proxy');
+        finalArgs.insert(1, proxy);
+      }
     }
 
     if (Platform.isAndroid || Platform.isIOS) {
       try {
         if (command == 'ffmpeg') {
-          return await _platform.invokeMethod('runFFmpeg', {'args': args});
+          return await _platform.invokeMethod('runFFmpeg', {'args': finalArgs});
         } else if (command == 'yt-dlp') {
           // Assuming a generic startDownload or similar for yt-dlp on mobile
           return await _platform.invokeMethod('startDownload', {
-            'url': args.last,
-            'args': args,
+            'url': finalArgs.last,
+            'args': finalArgs,
           });
         }
       } on PlatformException catch (e) {
@@ -90,7 +100,7 @@ class NativeService {
         return 'Error: Binary $command not found at $exePath';
       }
 
-      final result = await Process.run(exePath, args);
+      final result = await Process.run(exePath, finalArgs);
       if (result.exitCode == 0) {
         return result.stdout.toString();
       } else {
@@ -98,5 +108,21 @@ class NativeService {
       }
     }
     return null;
+  }
+
+  static Future<void> openFolder(String path) async {
+    final folder = Directory(path);
+    String finalPath = path;
+    if (!await folder.exists()) {
+      finalPath = p.dirname(path);
+    }
+
+    if (Platform.isWindows) {
+      await Process.run('explorer.exe', [finalPath]);
+    } else if (Platform.isMacOS) {
+      await Process.run('open', [finalPath]);
+    } else if (Platform.isLinux) {
+      await Process.run('xdg-open', [finalPath]);
+    }
   }
 }

@@ -73,8 +73,30 @@ class UniversalMetadata {
 }
 
 class ExtractionService extends ChangeNotifier {
-  final YoutubeExplode _yt = YoutubeExplode();
+  YoutubeExplode _yt = YoutubeExplode();
   final Map<String, UniversalMetadata> _cache = {};
+  String? _currentCookies;
+
+  void setCookies(String? cookies) {
+    if (_currentCookies == cookies) return;
+    _currentCookies = cookies;
+    _yt.close();
+
+    // For youtube_explode_dart, we'll use the default client for now
+    // as constructor injection varies by package version.
+    _yt = YoutubeExplode();
+    notifyListeners();
+  }
+
+  String? _currentProxy;
+
+  void setProxy(String? proxy) {
+    if (_currentProxy == proxy) return;
+    _currentProxy = proxy;
+    _yt.close();
+    _yt = YoutubeExplode();
+    notifyListeners();
+  }
 
   Future<UniversalMetadata?> getMetadata(String url) async {
     if (_cache.containsKey(url)) {
@@ -170,7 +192,7 @@ class ExtractionService extends ChangeNotifier {
         '-j',
         '--flat-playlist',
         url,
-      ]);
+      ], proxy: _currentProxy);
       if (result == null || result.startsWith('Error')) return null;
 
       // yt-dlp -j with --flat-playlist gives multiple JSON objects if it's a result of a search or playlist

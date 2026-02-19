@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 import 'dart:typed_data';
 import 'package:dio/dio.dart';
+import 'package:dio/io.dart';
 import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as p;
@@ -25,6 +26,8 @@ class DownloadTask {
   final bool downloadSubtitles;
   final bool downloadThumbnail;
   final String? videoId;
+  double transferRate; // bytes per second
+  Duration? eta;
 
   DownloadTask({
     required this.url,
@@ -40,6 +43,8 @@ class DownloadTask {
     this.downloadSubtitles = false,
     this.downloadThumbnail = false,
     this.videoId,
+    this.transferRate = 0,
+    this.eta,
   });
 }
 
@@ -49,7 +54,36 @@ class DownloadService extends ChangeNotifier {
   final List<DownloadTask> _queue = [];
   int _activeDownloads = 0;
   int maxConcurrentDownloads = 3;
+  String? _proxy;
   final YoutubeExplode _yt = YoutubeExplode();
+
+  DownloadService() {
+    _setupDio();
+  }
+
+  void _setupDio() {
+    if (_proxy != null && _proxy!.isNotEmpty) {
+      _dio.httpClientAdapter = IOHttpClientAdapter(
+        createHttpClient: () {
+          final client = HttpClient();
+          client.findProxy = (uri) {
+            return "PROXY $_proxy";
+          };
+          // For SOCKS, you might need a different approach depending on the platform,
+          // but "PROXY host:port" covers standard HTTP proxies.
+          // Note: Dart's HttpClient findProxy expects "PROXY <host>:<port>" or "DIRECT"
+          return client;
+        },
+      );
+    } else {
+      _dio.httpClientAdapter = IOHttpClientAdapter();
+    }
+  }
+
+  void updateProxy(String? proxy) {
+    _proxy = proxy;
+    _setupDio();
+  }
 
   Map<String, DownloadTask> get tasks => _tasks;
 
@@ -59,7 +93,11 @@ class DownloadService extends ChangeNotifier {
   }
 
   Future<void> runFFmpeg(List<String> args) async {
-    final result = await NativeService.runCommand('ffmpeg', args);
+    final result = await NativeService.runCommand(
+      'ffmpeg',
+      args,
+      proxy: _proxy,
+    );
     if (result != null && result.startsWith('Error')) {
       debugPrint("FFmpeg error: $result");
     }
@@ -99,7 +137,11 @@ class DownloadService extends ChangeNotifier {
       if (downloadThumbnail) '--write-thumbnail',
       url,
     ];
-    final result = await NativeService.runCommand('yt-dlp', args);
+    final result = await NativeService.runCommand(
+      'yt-dlp',
+      args,
+      proxy: _proxy,
+    );
     if (result != null && result.startsWith('Error')) {
       debugPrint("Platform download error: $result");
     }
@@ -192,72 +234,120 @@ class DownloadService extends ChangeNotifier {
   }
 
   Future<void> _startDownload(DownloadTask task) async {
-    try {
-      task.status = DownloadStatus.downloading;
-      task.errorMessage = null;
-      notifyListeners();
+    int retries = 0;
+    const int maxRetries = 5;
 
-      // Handle Thumbnail
-      if (task.downloadThumbnail && task.isYoutube && task.videoId != null) {
-        await _downloadYoutubeThumbnail(task.videoId!, task.savePath);
-      }
-
-      // Handle Subtitles for YouTube
-      if (task.downloadSubtitles && task.isYoutube && task.videoId != null) {
-        await _downloadYoutubeSubtitles(task.videoId!, task.savePath);
-      }
-
-      File file = File(task.savePath);
-      int existingLength = 0;
-      if (await file.exists()) {
-        existingLength = await file.length();
-      }
-
-      task.downloadedBytes = existingLength;
-
-      Response response = await _dio.get(
-        task.url,
-        options: Options(
-          responseType: ResponseType.stream,
-          headers: {if (existingLength > 0) 'range': 'bytes=$existingLength-'},
-        ),
-        cancelToken: task.cancelToken,
-      );
-
-      final total =
-          int.tryParse(response.headers.value('content-length') ?? '-1') ?? -1;
-      task.totalBytes = (existingLength > 0 && total != -1)
-          ? total + existingLength
-          : total;
-
-      final IOSink sink = file.openWrite(
-        mode: existingLength > 0 ? FileMode.append : FileMode.write,
-      );
-
-      final Stream<Uint8List> stream = response.data.stream;
-
-      await for (final data in stream) {
-        sink.add(data);
-        task.downloadedBytes += data.length;
-        if (task.totalBytes != -1) {
-          task.progress = task.downloadedBytes / task.totalBytes;
-        }
+    while (retries <= maxRetries) {
+      try {
+        task.status = DownloadStatus.downloading;
+        task.errorMessage = null;
         notifyListeners();
-      }
 
-      await sink.close();
-      task.status = DownloadStatus.completed;
-      task.progress = 1.0;
-      notifyListeners();
-    } catch (e) {
-      if (e is DioException && CancelToken.isCancel(e)) {
-        task.status = DownloadStatus.canceled;
-      } else {
-        task.status = DownloadStatus.error;
-        task.errorMessage = e.toString();
-        debugPrint('Download error: $e');
+        // Handle Thumbnail & Subtitles (only on first attempt)
+        if (retries == 0) {
+          if (task.downloadThumbnail &&
+              task.isYoutube &&
+              task.videoId != null) {
+            await _downloadYoutubeThumbnail(task.videoId!, task.savePath);
+          }
+          if (task.downloadSubtitles &&
+              task.isYoutube &&
+              task.videoId != null) {
+            await _downloadYoutubeSubtitles(task.videoId!, task.savePath);
+          }
+        }
+
+        File file = File(task.savePath);
+        int existingLength = 0;
+        if (await file.exists()) {
+          existingLength = await file.length();
+        }
+
+        task.downloadedBytes = existingLength;
+
+        Response response = await _dio.get(
+          task.url,
+          options: Options(
+            responseType: ResponseType.stream,
+            headers: {
+              if (existingLength > 0) 'range': 'bytes=$existingLength-',
+            },
+          ),
+          cancelToken: task.cancelToken,
+        );
+
+        final total =
+            int.tryParse(response.headers.value('content-length') ?? '-1') ??
+            -1;
+        task.totalBytes = (existingLength > 0 && total != -1)
+            ? total + existingLength
+            : total;
+
+        final IOSink sink = file.openWrite(
+          mode: existingLength > 0 ? FileMode.append : FileMode.write,
+        );
+
+        final Stream<Uint8List> stream = response.data.stream;
+        int lastBytes = task.downloadedBytes;
+        DateTime lastTime = DateTime.now();
+
+        await for (final data in stream) {
+          sink.add(data);
+          task.downloadedBytes += data.length;
+
+          final now = DateTime.now();
+          final diffMs = now.difference(lastTime).inMilliseconds;
+          if (diffMs >= 1000) {
+            final diffBytes = task.downloadedBytes - lastBytes;
+            task.transferRate = (diffBytes / diffMs) * 1000;
+            if (task.totalBytes != -1) {
+              final remaining = task.totalBytes - task.downloadedBytes;
+              if (task.transferRate > 0) {
+                task.eta = Duration(
+                  seconds: (remaining / task.transferRate).floor(),
+                );
+              }
+            }
+            lastBytes = task.downloadedBytes;
+            lastTime = now;
+          }
+
+          if (task.totalBytes != -1) {
+            task.progress = task.downloadedBytes / task.totalBytes;
+          }
+          notifyListeners();
+        }
+
+        await sink.close();
+        task.status = DownloadStatus.completed;
+        task.progress = 1.0;
+        task.transferRate = 0;
+        task.eta = null;
+        notifyListeners();
+        return; // Success, exit loop
+      } catch (e) {
+        if (e is DioException && CancelToken.isCancel(e)) {
+          task.status = DownloadStatus.canceled;
+          notifyListeners();
+          return;
+        }
+
+        retries++;
+        if (retries > maxRetries) {
+          task.status = DownloadStatus.error;
+          task.errorMessage = e.toString();
+          debugPrint('Download error (fatal): $e');
+          notifyListeners();
+          return;
+        }
+
+        // Exponential backoff: 2^retries * 1000ms
+        final delay = Duration(milliseconds: (retries * retries * 1000));
+        debugPrint(
+          'Download error: $e. Retrying in ${delay.inSeconds}s... ($retries/$maxRetries)',
+        );
+        await Future.delayed(delay);
       }
-      notifyListeners();
     }
   }
 
@@ -340,6 +430,13 @@ class DownloadService extends ChangeNotifier {
       task.status = DownloadStatus.canceled;
       _tasks.remove(url);
       notifyListeners();
+    }
+  }
+
+  void openFileFolder(String url) {
+    final task = _tasks[url];
+    if (task != null) {
+      NativeService.openFolder(task.savePath);
     }
   }
 }

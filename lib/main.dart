@@ -16,6 +16,7 @@ import 'services/subscription_service.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:system_tray/system_tray.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'dart:io';
 
 void main() async {
@@ -238,6 +239,7 @@ class _MyHomePageState extends State<MyHomePage> {
           configService.config.maxConcurrentDownloads,
         );
       }
+      downloadService.updateDownloadFolder(configService.config.downloadFolder);
       downloadService.updateProxy(configService.config.proxySettings);
       extractionService.setProxy(configService.config.proxySettings);
       final cookies = await cookieService.getCookieString(
@@ -249,6 +251,10 @@ class _MyHomePageState extends State<MyHomePage> {
     return Scaffold(
       extendBodyBehindAppBar: true,
       appBar: AppBar(
+        leading: Padding(
+          padding: const EdgeInsets.all(8.0),
+          child: SvgPicture.asset('assets/app_icon.svg'),
+        ),
         title: Text(
           widget.title,
           style: GoogleFonts.outfit(fontWeight: FontWeight.bold),
@@ -423,6 +429,26 @@ class _MyHomePageState extends State<MyHomePage> {
                 if (_currentMetadata != null) ...[
                   const SizedBox(height: 32),
                   _buildMetadataCard(context, downloadService),
+                ] else if (downloadService.tasks.isEmpty) ...[
+                  const SizedBox(height: 60),
+                  Animate(
+                    effects: const [
+                      FadeEffect(duration: Duration(seconds: 1)),
+                      ScaleEffect(
+                        begin: Offset(0.8, 0.8),
+                        duration: Duration(seconds: 1),
+                      ),
+                    ],
+                    child: Center(
+                      child: Opacity(
+                        opacity: 0.1,
+                        child: SvgPicture.asset(
+                          'assets/app_icon.svg',
+                          width: 200,
+                        ),
+                      ),
+                    ),
+                  ),
                 ],
 
                 const SizedBox(height: 32),

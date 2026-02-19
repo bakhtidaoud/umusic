@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:file_picker/file_picker.dart';
 import '../services/config_service.dart';
 
 class SettingsScreen extends StatelessWidget {
@@ -27,7 +28,11 @@ class SettingsScreen extends StatelessWidget {
             subtitle: config.downloadFolder ?? 'Default',
             icon: Icons.folder_open,
             onTap: () async {
-              // TODO: Implement folder picker
+              String? selectedDirectory = await FilePicker.platform
+                  .getDirectoryPath();
+              if (selectedDirectory != null) {
+                configService.setDownloadFolder(selectedDirectory);
+              }
             },
           ),
           _buildSliderTile(

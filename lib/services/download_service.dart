@@ -7,6 +7,8 @@ import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as p;
 import 'package:youtube_explode_dart/youtube_explode_dart.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'native_service.dart';
 import 'extraction_service.dart';
 
@@ -57,8 +59,23 @@ class DownloadService extends ChangeNotifier {
   String? _proxy;
   final YoutubeExplode _yt = YoutubeExplode();
 
+  String? _downloadFolder;
+  final FlutterLocalNotificationsPlugin _notifications =
+      FlutterLocalNotificationsPlugin();
+
   DownloadService() {
     _setupDio();
+    _initNotifications();
+  }
+
+  Future<void> _initNotifications() async {
+    const androidInit = AndroidInitializationSettings('@mipmap/ic_launcher');
+    const initSettings = InitializationSettings(android: androidInit);
+    await _notifications.initialize(initSettings);
+  }
+
+  void updateDownloadFolder(String? path) {
+    _downloadFolder = path;
   }
 
   void _setupDio() {
@@ -190,8 +207,18 @@ class DownloadService extends ChangeNotifier {
     bool isYoutube = false,
   }) async {
     final name = fileName ?? p.basename(Uri.parse(url).path);
-    final directory = await getApplicationDocumentsDirectory();
-    final savePath = p.join(directory.path, name);
+    String dirPath;
+    if (_downloadFolder != null) {
+      dirPath = _downloadFolder!;
+    } else {
+      if (Platform.isAndroid) {
+        dirPath = '/storage/emulated/0/Download';
+      } else {
+        final directory = await getApplicationDocumentsDirectory();
+        dirPath = directory.path;
+      }
+    }
+    final savePath = p.join(dirPath, name);
 
     if (_tasks.containsKey(url)) return;
 
@@ -239,9 +266,27 @@ class DownloadService extends ChangeNotifier {
 
     while (retries <= maxRetries) {
       try {
+        if (Platform.isAndroid) {
+          if (!await Permission.storage.request().isGranted) {
+            task.status = DownloadStatus.error;
+            task.errorMessage = "Storage permission denied";
+            notifyListeners();
+            return;
+          }
+          if (await Permission.notification.isDenied) {
+            await Permission.notification.request();
+          }
+        }
+
         task.status = DownloadStatus.downloading;
         task.errorMessage = null;
         notifyListeners();
+
+        _sendNotification(
+          task.url.hashCode,
+          'uMusic: Downloading',
+          'Starting ${task.fileName}...',
+        );
 
         // Handle Thumbnail & Subtitles (only on first attempt)
         if (retries == 0) {
@@ -314,6 +359,16 @@ class DownloadService extends ChangeNotifier {
 
           if (task.totalBytes != -1) {
             task.progress = task.downloadedBytes / task.totalBytes;
+
+            // Update notification every few percent to avoid spamming
+            if ((task.progress * 100).toInt() % 5 == 0) {
+              _sendNotification(
+                task.url.hashCode,
+                'uMusic: Downloading',
+                '${task.fileName}: ${(task.progress * 100).toStringAsFixed(0)}%',
+                progress: (task.progress * 100).toInt(),
+              );
+            }
           }
           notifyListeners();
         }
@@ -323,6 +378,14 @@ class DownloadService extends ChangeNotifier {
         task.progress = 1.0;
         task.transferRate = 0;
         task.eta = null;
+
+        _sendNotification(
+          task.url.hashCode,
+          'uMusic: Finished',
+          'Successfully downloaded ${task.fileName}',
+          completed: true,
+        );
+
         notifyListeners();
         return; // Success, exit loop
       } catch (e) {
@@ -337,6 +400,13 @@ class DownloadService extends ChangeNotifier {
           task.status = DownloadStatus.error;
           task.errorMessage = e.toString();
           debugPrint('Download error (fatal): $e');
+
+          _sendNotification(
+            task.url.hashCode,
+            'uMusic: Failed',
+            'Error downloading ${task.fileName}',
+          );
+
           notifyListeners();
           return;
         }
@@ -417,6 +487,35 @@ class DownloadService extends ChangeNotifier {
     if (task != null) {
       NativeService.openFolder(task.savePath);
     }
+  }
+
+  Future<void> _sendNotification(
+    int id,
+    String title,
+    String body, {
+    bool completed = false,
+    int progress = 0,
+    int maxProgress = 100,
+  }) async {
+    final androidDetails = AndroidNotificationDetails(
+      'download_channel_id',
+      'Download Notifications',
+      channelDescription: 'Showing download progress and completion',
+      importance: Importance.max,
+      priority: Priority.high,
+      showWhen: true,
+      onlyAlertOnce: !completed,
+      showProgress: !completed,
+      maxProgress: maxProgress,
+      progress: progress,
+    );
+    final details = NotificationDetails(android: androidDetails);
+    await _notifications.show(
+      id: id,
+      title: title,
+      body: body,
+      notificationDetails: details,
+    );
   }
 }
 

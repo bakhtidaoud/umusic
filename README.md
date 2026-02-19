@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="https://img.icons8.com/isometric/512/music.png" width="120" />
+  <img src="assets/app_icon.svg" width="128" />
 </p>
 
 <h1 align="center">uMusic</h1>
@@ -66,9 +66,7 @@
 ## 📸 Screenshots
 
 <p align="center">
-  <img src="https://via.placeholder.com/300x600?text=U+Music+Discovery" width="200" />
-  <img src="https://via.placeholder.com/300x600?text=Player+Screen" width="200" />
-  <img src="https://via.placeholder.com/300x600?text=Downloads" width="200" />
+  <img src="assets/app_icon.svg" width="200" alt="uMusic Logo Large" />
 </p>
 
 ---

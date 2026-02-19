@@ -30,11 +30,12 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   // Initialize Background Audio
+  /*
   await JustAudioBackground.init(
     androidNotificationChannelId: 'com.ryanheise.bg_demo.channel.audio',
     androidNotificationChannelName: 'Audio playback',
     androidNotificationOngoing: true,
-  );
+  );*/
 
   final prefs = await SharedPreferences.getInstance();
 

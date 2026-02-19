@@ -7,8 +7,9 @@ import android.os.Bundle
 import java.io.File
 import java.io.FileOutputStream
 import java.io.InputStream
+import com.ryanheise.audioservice.AudioServiceActivity
 
-class MainActivity : FlutterActivity() {
+class MainActivity : AudioServiceActivity() {
     private val CHANNEL = "downloader_channel"
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {

@@ -15,6 +15,7 @@ import 'screens/subscriptions_screen.dart';
 import 'services/subscription_service.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:system_tray/system_tray.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'dart:io';
 
 void main() async {
@@ -81,11 +82,13 @@ class MyApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       themeMode: themeMode,
       theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: Colors.deepPurple,
-          brightness: Brightness.light,
-        ),
         useMaterial3: true,
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: const Color(0xFF673AB7),
+          brightness: Brightness.light,
+          surface: const Color(0xFFFBF9FF),
+        ),
+        textTheme: GoogleFonts.outfitTextTheme(),
         pageTransitionsTheme: const PageTransitionsTheme(
           builders: {
             TargetPlatform.android: ZoomPageTransitionsBuilder(),
@@ -96,11 +99,14 @@ class MyApp extends StatelessWidget {
         ),
       ),
       darkTheme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: Colors.deepPurple,
-          brightness: Brightness.dark,
-        ),
         useMaterial3: true,
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: const Color(0xFFD1C4E9),
+          brightness: Brightness.dark,
+          surface: const Color(0xFF0D0B14),
+          primary: const Color(0xFFBB86FC),
+        ),
+        textTheme: GoogleFonts.outfitTextTheme(ThemeData.dark().textTheme),
         pageTransitionsTheme: const PageTransitionsTheme(
           builders: {
             TargetPlatform.android: ZoomPageTransitionsBuilder(),
@@ -241,11 +247,14 @@ class _MyHomePageState extends State<MyHomePage> {
     });
 
     return Scaffold(
+      extendBodyBehindAppBar: true,
       appBar: AppBar(
         title: Text(
           widget.title,
-          style: const TextStyle(fontWeight: FontWeight.bold),
+          style: GoogleFonts.outfit(fontWeight: FontWeight.bold),
         ),
+        backgroundColor: Colors.transparent,
+        elevation: 0,
         centerTitle: true,
         actions: [
           IconButton(
@@ -311,57 +320,116 @@ class _MyHomePageState extends State<MyHomePage> {
           ),
         ],
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            // URL Input Section
-            TextField(
-              controller: _urlController,
-              decoration: InputDecoration(
-                hintText: 'Paste video or playlist link',
-                prefixIcon: const Icon(Icons.link),
-                suffixIcon: IconButton(
-                  icon: const Icon(Icons.content_paste),
-                  tooltip: 'Paste',
-                  onPressed: _pasteFromClipboard,
+      body: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: configService.config.themeMode == 'dark'
+                ? [
+                    const Color(0xFF0D0B14),
+                    const Color(0xFF1A1625),
+                    const Color(0xFF0D0B14),
+                  ]
+                : [
+                    const Color(0xFFFBF9FF),
+                    const Color(0xFFF0E7FF),
+                    const Color(0xFFFBF9FF),
+                  ],
+          ),
+        ),
+        child: SafeArea(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // URL Input Section
+                Container(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(20),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Theme.of(
+                          context,
+                        ).colorScheme.primary.withOpacity(0.1),
+                        blurRadius: 20,
+                        offset: const Offset(0, 10),
+                      ),
+                    ],
+                  ),
+                  child: TextField(
+                    controller: _urlController,
+                    style: const TextStyle(fontSize: 14),
+                    decoration: InputDecoration(
+                      hintText: 'Paste video or playlist link',
+                      prefixIcon: const Icon(Icons.link_rounded),
+                      suffixIcon: Padding(
+                        padding: const EdgeInsets.all(8.0),
+                        child: IconButton.filledTonal(
+                          icon: const Icon(
+                            Icons.content_paste_rounded,
+                            size: 20,
+                          ),
+                          tooltip: 'Paste',
+                          onPressed: _pasteFromClipboard,
+                        ),
+                      ),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(20),
+                        borderSide: BorderSide.none,
+                      ),
+                      filled: true,
+                      fillColor: Theme.of(context).colorScheme.surface,
+                    ),
+                    onSubmitted: (_) => _fetchMetadata(),
+                  ),
                 ),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(16),
+                const SizedBox(height: 20),
+
+                Animate(
+                  effects: const [
+                    FadeEffect(),
+                    ScaleEffect(begin: Offset(0.95, 0.95)),
+                  ],
+                  child: ElevatedButton.icon(
+                    onPressed: _isLoading ? null : _fetchMetadata,
+                    icon: _isLoading
+                        ? const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.auto_awesome_rounded),
+                    label: const Text(
+                      'Analyze Content',
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 20),
+                      backgroundColor: Theme.of(context).colorScheme.primary,
+                      foregroundColor: Theme.of(context).colorScheme.onPrimary,
+                      elevation: 8,
+                      shadowColor: Theme.of(
+                        context,
+                      ).colorScheme.primary.withOpacity(0.5),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                    ),
+                  ),
                 ),
-                filled: true,
-              ),
-              onSubmitted: (_) => _fetchMetadata(),
+
+                if (_currentMetadata != null) ...[
+                  const SizedBox(height: 32),
+                  _buildMetadataCard(context, downloadService),
+                ],
+
+                const SizedBox(height: 32),
+                _buildActiveDownloadsSection(context, downloadService),
+              ],
             ),
-            const SizedBox(height: 16),
-
-            ElevatedButton.icon(
-              onPressed: _isLoading ? null : _fetchMetadata,
-              icon: _isLoading
-                  ? const SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : const Icon(Icons.auto_awesome),
-              label: const Text('Analyze Link'),
-              style: ElevatedButton.styleFrom(
-                padding: const EdgeInsets.all(16),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-            ),
-
-            if (_currentMetadata != null) ...[
-              const SizedBox(height: 24),
-              _buildMetadataCard(context, downloadService),
-            ],
-
-            const SizedBox(height: 32),
-            _buildActiveDownloadsSection(context, downloadService),
-          ],
+          ),
         ),
       ),
     );
@@ -371,34 +439,63 @@ class _MyHomePageState extends State<MyHomePage> {
     BuildContext context,
     DownloadService downloadService,
   ) {
-    return Card(
-      elevation: 0,
-      color: Theme.of(context).colorScheme.surfaceVariant.withOpacity(0.3),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
+    final colorScheme = Theme.of(context).colorScheme;
+    return Animate(
+      effects: const [
+        FadeEffect(duration: Duration(milliseconds: 500)),
+        SlideEffect(begin: Offset(0, 0.1), end: Offset.zero),
+      ],
+      child: Container(
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: colorScheme.surface.withOpacity(0.7),
+          borderRadius: BorderRadius.circular(28),
+          border: Border.all(color: colorScheme.primary.withOpacity(0.1)),
+          boxShadow: [
+            BoxShadow(
+              color: colorScheme.primary.withOpacity(0.05),
+              blurRadius: 30,
+              spreadRadius: 5,
+            ),
+          ],
+        ),
         child: Column(
           children: [
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(12),
-                  child: _currentMetadata!.thumbnailUrl != null
-                      ? Image.network(
-                          _currentMetadata!.thumbnailUrl!,
-                          width: 120,
-                          height: 68,
-                          fit: BoxFit.cover,
-                        )
-                      : Container(
-                          width: 120,
-                          height: 68,
-                          color: Colors.grey,
-                          child: const Icon(Icons.play_circle),
-                        ),
+                Container(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(16),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.2),
+                        blurRadius: 10,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(16),
+                    child: _currentMetadata!.thumbnailUrl != null
+                        ? Image.network(
+                            _currentMetadata!.thumbnailUrl!,
+                            width: 140,
+                            height: 80,
+                            fit: BoxFit.cover,
+                          )
+                        : Container(
+                            width: 140,
+                            height: 80,
+                            color: colorScheme.surfaceVariant,
+                            child: const Icon(
+                              Icons.play_circle_fill_rounded,
+                              size: 40,
+                            ),
+                          ),
+                  ),
                 ),
-                const SizedBox(width: 12),
+                const SizedBox(width: 16),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -407,19 +504,39 @@ class _MyHomePageState extends State<MyHomePage> {
                         _currentMetadata!.title,
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(fontWeight: FontWeight.bold),
+                        style: GoogleFonts.outfit(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          height: 1.2,
+                        ),
                       ),
-                      const SizedBox(height: 4),
-                      Text(
-                        _currentMetadata!.author ?? 'Unknown',
-                        style: Theme.of(context).textTheme.bodySmall,
+                      const SizedBox(height: 6),
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.person_outline_rounded,
+                            size: 14,
+                            color: colorScheme.primary,
+                          ),
+                          const SizedBox(width: 4),
+                          Expanded(
+                            child: Text(
+                              _currentMetadata!.author ?? 'Unknown Creator',
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: colorScheme.onSurfaceVariant,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ],
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 24),
 
             if (!_currentMetadata!.isPlaylist) ...[
               Row(
@@ -427,13 +544,32 @@ class _MyHomePageState extends State<MyHomePage> {
                   Expanded(
                     child: DropdownButtonFormField<String>(
                       value: _selectedFormatType,
-                      decoration: const InputDecoration(
-                        labelText: 'Type',
-                        border: OutlineInputBorder(),
+                      decoration: InputDecoration(
+                        labelText: 'Content Type',
+                        labelStyle: TextStyle(
+                          fontSize: 12,
+                          color: colorScheme.primary,
+                        ),
+                        filled: true,
+                        fillColor: colorScheme.primary.withOpacity(0.05),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(15),
+                          borderSide: BorderSide.none,
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 8,
+                        ),
                       ),
                       items: const [
-                        DropdownMenuItem(value: 'video', child: Text('Video')),
-                        DropdownMenuItem(value: 'audio', child: Text('Audio')),
+                        DropdownMenuItem(
+                          value: 'video',
+                          child: Text('Video', style: TextStyle(fontSize: 14)),
+                        ),
+                        DropdownMenuItem(
+                          value: 'audio',
+                          child: Text('Audio', style: TextStyle(fontSize: 14)),
+                        ),
                       ],
                       onChanged: (val) =>
                           setState(() => _selectedFormatType = val!),
@@ -443,124 +579,123 @@ class _MyHomePageState extends State<MyHomePage> {
                   Expanded(
                     child: DropdownButtonFormField<YtDlpFormat>(
                       value: _selectedQuality,
-                      decoration: const InputDecoration(
-                        labelText: 'Quality',
-                        border: OutlineInputBorder(),
+                      isExpanded: true,
+                      decoration: InputDecoration(
+                        labelText: 'Set Quality',
+                        labelStyle: TextStyle(
+                          fontSize: 12,
+                          color: colorScheme.primary,
+                        ),
+                        filled: true,
+                        fillColor: colorScheme.primary.withOpacity(0.05),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(15),
+                          borderSide: BorderSide.none,
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 8,
+                        ),
                       ),
-                      items: _currentMetadata!.formats
-                          .map(
-                            (f) => DropdownMenuItem(
-                              value: f,
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Text(
-                                    '${f.resolution ?? f.ext} (${f.filesizeMb?.toStringAsFixed(1) ?? "?"} MB)',
-                                  ),
-                                  if (f.isHdr) ...[
-                                    const SizedBox(width: 4),
-                                    const Text(
-                                      '🔥HDR',
-                                      style: TextStyle(
-                                        color: Colors.orange,
-                                        fontSize: 10,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                  ],
-                                  if (f.is360) ...[
-                                    const SizedBox(width: 4),
-                                    const Text(
-                                      '🌐360°',
-                                      style: TextStyle(
-                                        color: Colors.blue,
-                                        fontSize: 10,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                  ],
-                                  if (f.is3d) ...[
-                                    const SizedBox(width: 4),
-                                    const Text(
-                                      '🕶️3D',
-                                      style: TextStyle(
-                                        color: Colors.purple,
-                                        fontSize: 10,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                  ],
+                      items: _currentMetadata!.formats.map((f) {
+                        return DropdownMenuItem(
+                          value: f,
+                          child: SingleChildScrollView(
+                            scrollDirection: Axis.horizontal,
+                            child: Row(
+                              children: [
+                                Text(
+                                  '${f.resolution ?? f.ext}',
+                                  style: const TextStyle(fontSize: 14),
+                                ),
+                                if (f.isHdr) ...[
+                                  const SizedBox(width: 4),
+                                  _buildBadge('HDR', Colors.orange),
                                 ],
-                              ),
+                                if (f.is360) ...[
+                                  const SizedBox(width: 4),
+                                  _buildBadge('360°', Colors.blue),
+                                ],
+                                if (f.is3d) ...[
+                                  const SizedBox(width: 4),
+                                  _buildBadge('3D', Colors.purple),
+                                ],
+                              ],
                             ),
-                          )
-                          .toList(),
+                          ),
+                        );
+                      }).toList(),
                       onChanged: (val) =>
                           setState(() => _selectedQuality = val),
                     ),
                   ),
                 ],
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 16),
               if (_selectedQuality?.isHdr ?? false)
                 Container(
-                  margin: const EdgeInsets.only(bottom: 12),
-                  padding: const EdgeInsets.all(8),
+                  padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: Colors.orange.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.orange.withOpacity(0.3)),
+                    color: Colors.orange.withOpacity(0.08),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: Colors.orange.withOpacity(0.2)),
                   ),
-                  child: const Row(
+                  child: Row(
                     children: [
-                      Icon(Icons.info_outline, size: 16, color: Colors.orange),
-                      SizedBox(width: 8),
-                      Expanded(
+                      const Icon(
+                        Icons.info_rounded,
+                        size: 18,
+                        color: Colors.orange,
+                      ),
+                      const SizedBox(width: 10),
+                      const Expanded(
                         child: Text(
-                          'HDR recommended: Use VLC or MPC-HC for playback.',
-                          style: TextStyle(fontSize: 11, color: Colors.orange),
+                          'HDR requires specialized players like VLC for correct colors.',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.orange,
+                            fontWeight: FontWeight.w500,
+                          ),
                         ),
                       ),
                     ],
                   ),
                 ),
+              const SizedBox(height: 16),
               Row(
                 children: [
                   Expanded(
-                    child: CheckboxListTile(
-                      title: const Text(
-                        'Subtitles',
-                        style: TextStyle(fontSize: 12),
-                      ),
-                      value: _downloadSubtitles,
-                      dense: true,
-                      onChanged: (v) =>
-                          setState(() => _downloadSubtitles = v ?? false),
+                    child: _buildGlassSwitch(
+                      'Subtitles',
+                      _downloadSubtitles,
+                      (v) => setState(() => _downloadSubtitles = v),
                     ),
                   ),
+                  const SizedBox(width: 12),
                   Expanded(
-                    child: CheckboxListTile(
-                      title: const Text(
-                        'Thumbnail',
-                        style: TextStyle(fontSize: 12),
-                      ),
-                      value: _downloadThumbnail,
-                      dense: true,
-                      onChanged: (v) =>
-                          setState(() => _downloadThumbnail = v ?? false),
+                    child: _buildGlassSwitch(
+                      'Thumbnail',
+                      _downloadThumbnail,
+                      (v) => setState(() => _downloadThumbnail = v),
                     ),
                   ),
                 ],
               ),
-              const SizedBox(height: 16),
-              FilledButton.icon(
-                onPressed: () => _startDownload(context),
-                icon: const Icon(Icons.download),
-                label: const Text('Start Download'),
-                style: FilledButton.styleFrom(
-                  minimumSize: const Size.fromHeight(56),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
+              const SizedBox(height: 24),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton.icon(
+                  onPressed: () => _startDownload(context),
+                  icon: const Icon(Icons.download_rounded),
+                  label: const Text(
+                    'Initialize Download',
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  style: FilledButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 18),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
                   ),
                 ),
               ),
@@ -657,6 +792,68 @@ class _MyHomePageState extends State<MyHomePage> {
           },
         ),
       ],
+    );
+  }
+
+  Widget _buildBadge(String label, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: color.withOpacity(0.2)),
+      ),
+      child: Text(
+        label,
+        style: GoogleFonts.outfit(
+          fontSize: 10,
+          fontWeight: FontWeight.bold,
+          color: color,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildGlassSwitch(
+    String label,
+    bool value,
+    ValueChanged<bool> onChanged,
+  ) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return Container(
+      decoration: BoxDecoration(
+        color: colorScheme.surface.withOpacity(0.5),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: colorScheme.primary.withOpacity(0.05)),
+      ),
+      child: InkWell(
+        onTap: () => onChanged(!value),
+        borderRadius: BorderRadius.circular(16),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+          child: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  label,
+                  style: GoogleFonts.outfit(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
+              Transform.scale(
+                scale: 0.7,
+                child: Switch(
+                  value: value,
+                  onChanged: onChanged,
+                  activeColor: colorScheme.primary,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

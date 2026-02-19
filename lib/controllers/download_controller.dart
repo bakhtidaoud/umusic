@@ -10,6 +10,7 @@ import 'package:youtube_explode_dart/youtube_explode_dart.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:permission_handler/permission_handler.dart';
 import '../services/extraction_service.dart';
+import 'library_controller.dart';
 
 enum DownloadStatus { pending, downloading, paused, completed, canceled, error }
 
@@ -276,6 +277,12 @@ class DownloadController extends GetxController {
         );
 
         _activeDownloads--;
+
+        // Refresh library if controller exists
+        if (Get.isRegistered<LibraryController>()) {
+          Get.find<LibraryController>().scanFiles();
+        }
+
         _processQueue();
         return;
       } catch (e) {

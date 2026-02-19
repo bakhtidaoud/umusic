@@ -12,13 +12,16 @@ import 'controllers/config_controller.dart';
 import 'controllers/download_controller.dart';
 import 'controllers/subscription_controller.dart';
 import 'controllers/cookie_controller.dart';
+import 'controllers/library_controller.dart';
 import 'screens/login_webview_screen.dart';
 import 'screens/settings_screen.dart';
 import 'screens/browser_screen.dart';
 import 'screens/subscriptions_screen.dart';
 import 'screens/home_screen.dart';
 import 'screens/downloader_screen.dart';
+import 'screens/local_library_screen.dart';
 import 'widgets/custom_drawer.dart';
+import 'utils/design_system.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -36,6 +39,7 @@ void main() async {
   Get.put(ExtractionService());
   Get.put(SubscriptionController(prefs));
   Get.put(CookieController());
+  Get.put(LibraryController());
 
   runApp(const MyApp());
 }
@@ -78,37 +82,13 @@ class MyApp extends StatelessWidget {
         theme: ThemeData(
           useMaterial3: true,
           colorScheme: ColorScheme.fromSeed(
-            seedColor: const Color(0xFF673AB7),
+            seedColor: UDesign.primary,
             brightness: Brightness.light,
-            surface: const Color(0xFFFBF9FF),
           ),
           textTheme: GoogleFonts.outfitTextTheme(),
-          pageTransitionsTheme: const PageTransitionsTheme(
-            builders: {
-              TargetPlatform.android: ZoomPageTransitionsBuilder(),
-              TargetPlatform.iOS: CupertinoPageTransitionsBuilder(),
-              TargetPlatform.windows: ZoomPageTransitionsBuilder(),
-              TargetPlatform.macOS: ZoomPageTransitionsBuilder(),
-            },
-          ),
         ),
-        darkTheme: ThemeData(
-          useMaterial3: true,
-          colorScheme: ColorScheme.fromSeed(
-            seedColor: const Color(0xFFD1C4E9),
-            brightness: Brightness.dark,
-            surface: const Color(0xFF0D0B14),
-            primary: const Color(0xFFBB86FC),
-          ),
+        darkTheme: UDesign.darkTheme.copyWith(
           textTheme: GoogleFonts.outfitTextTheme(ThemeData.dark().textTheme),
-          pageTransitionsTheme: const PageTransitionsTheme(
-            builders: {
-              TargetPlatform.android: ZoomPageTransitionsBuilder(),
-              TargetPlatform.iOS: CupertinoPageTransitionsBuilder(),
-              TargetPlatform.windows: ZoomPageTransitionsBuilder(),
-              TargetPlatform.macOS: ZoomPageTransitionsBuilder(),
-            },
-          ),
         ),
         home: const MyHomePage(title: 'uMusic'),
       );
@@ -143,6 +123,7 @@ class _MyHomePageState extends State<MyHomePage> {
   final List<String> _titles = [
     'uMusic Home',
     'Downloader',
+    'Local Library',
     'Subscriptions',
     'Browser',
     'Settings',
@@ -180,32 +161,40 @@ class _MyHomePageState extends State<MyHomePage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: UDesign.background,
       appBar: AppBar(
         title: Text(
           _titles[_selectedIndex],
-          style: GoogleFonts.outfit(fontWeight: FontWeight.bold),
+          style: GoogleFonts.outfit(
+            fontWeight: FontWeight.bold,
+            letterSpacing: -0.5,
+          ),
         ),
         centerTitle: true,
         backgroundColor: Colors.transparent,
         elevation: 0,
+        surfaceTintColor: Colors.transparent,
         leading: Builder(
           builder: (context) => IconButton(
-            icon: const Icon(Icons.menu_rounded),
+            icon: const Icon(Icons.menu_rounded, size: 28),
             onPressed: () => Scaffold.of(context).openDrawer(),
           ),
         ),
         actions: [
           if (_selectedIndex == 0)
-            IconButton(
-              icon: const Icon(Icons.account_circle_outlined),
-              onPressed: () {
-                Get.to(
-                  () => const LoginWebViewScreen(
-                    initialUrl:
-                        'https://accounts.google.com/ServiceLogin?service=youtube',
-                  ),
-                );
-              },
+            Padding(
+              padding: const EdgeInsets.only(right: 8.0),
+              child: IconButton(
+                icon: const Icon(Icons.account_circle_outlined, size: 28),
+                onPressed: () {
+                  Get.to(
+                    () => const LoginWebViewScreen(
+                      initialUrl:
+                          'https://accounts.google.com/ServiceLogin?service=youtube',
+                    ),
+                  );
+                },
+              ),
             ),
         ],
       ),
@@ -213,7 +202,11 @@ class _MyHomePageState extends State<MyHomePage> {
         selectedIndex: _selectedIndex,
         onDestinationSelected: (index) {
           setState(() => _selectedIndex = index);
-          _pageController.jumpToPage(index);
+          _pageController.animateToPage(
+            index,
+            duration: const Duration(milliseconds: 400),
+            curve: Curves.easeInOutExpo,
+          );
         },
       ),
       body: PageView(
@@ -222,6 +215,7 @@ class _MyHomePageState extends State<MyHomePage> {
         children: [
           const HomeScreen(),
           DownloaderScreen(initialUrl: _prefetchedUrl),
+          const LocalLibraryScreen(),
           const SubscriptionsScreen(),
           const BrowserScreen(),
           const SettingsScreen(),

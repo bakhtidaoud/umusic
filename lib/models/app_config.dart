@@ -7,6 +7,15 @@ class AppConfig {
   final int maxConcurrentDownloads;
   final String? proxySettings;
   final String themeMode; // 'light', 'dark', 'system'
+  final String preferredVideoCodec; // 'h264', 'vp9', 'av1'
+  final String preferredAudioQuality; // 'best', '128k', '320k'
+  final int networkTimeout; // in seconds
+  final String? cookiesFile;
+  final String? archiveFile;
+
+  final bool smartModeEnabled;
+  final String? lastFormatType;
+  final String? lastQualityId;
 
   AppConfig({
     this.downloadFolder,
@@ -15,6 +24,14 @@ class AppConfig {
     this.maxConcurrentDownloads = 3,
     this.proxySettings,
     this.themeMode = 'system',
+    this.preferredVideoCodec = 'h264',
+    this.preferredAudioQuality = 'best',
+    this.networkTimeout = 30,
+    this.cookiesFile,
+    this.archiveFile,
+    this.smartModeEnabled = false,
+    this.lastFormatType,
+    this.lastQualityId,
   });
 
   AppConfig copyWith({
@@ -24,6 +41,14 @@ class AppConfig {
     int? maxConcurrentDownloads,
     String? proxySettings,
     String? themeMode,
+    String? preferredVideoCodec,
+    String? preferredAudioQuality,
+    int? networkTimeout,
+    String? cookiesFile,
+    String? archiveFile,
+    bool? smartModeEnabled,
+    String? lastFormatType,
+    String? lastQualityId,
   }) {
     return AppConfig(
       downloadFolder: downloadFolder ?? this.downloadFolder,
@@ -33,6 +58,15 @@ class AppConfig {
           maxConcurrentDownloads ?? this.maxConcurrentDownloads,
       proxySettings: proxySettings ?? this.proxySettings,
       themeMode: themeMode ?? this.themeMode,
+      preferredVideoCodec: preferredVideoCodec ?? this.preferredVideoCodec,
+      preferredAudioQuality:
+          preferredAudioQuality ?? this.preferredAudioQuality,
+      networkTimeout: networkTimeout ?? this.networkTimeout,
+      cookiesFile: cookiesFile ?? this.cookiesFile,
+      archiveFile: archiveFile ?? this.archiveFile,
+      smartModeEnabled: smartModeEnabled ?? this.smartModeEnabled,
+      lastFormatType: lastFormatType ?? this.lastFormatType,
+      lastQualityId: lastQualityId ?? this.lastQualityId,
     );
   }
 
@@ -44,6 +78,14 @@ class AppConfig {
       'maxConcurrentDownloads': maxConcurrentDownloads,
       'proxySettings': proxySettings,
       'themeMode': themeMode,
+      'preferredVideoCodec': preferredVideoCodec,
+      'preferredAudioQuality': preferredAudioQuality,
+      'networkTimeout': networkTimeout,
+      'cookiesFile': cookiesFile,
+      'archiveFile': archiveFile,
+      'smartModeEnabled': smartModeEnabled,
+      'lastFormatType': lastFormatType,
+      'lastQualityId': lastQualityId,
     };
   }
 
@@ -55,6 +97,14 @@ class AppConfig {
       maxConcurrentDownloads: map['maxConcurrentDownloads'] ?? 3,
       proxySettings: map['proxySettings'] as String?,
       themeMode: map['themeMode'] ?? 'system',
+      preferredVideoCodec: map['preferredVideoCodec'] ?? 'h264',
+      preferredAudioQuality: map['preferredAudioQuality'] ?? 'best',
+      networkTimeout: map['networkTimeout'] ?? 30,
+      cookiesFile: map['cookiesFile'] as String?,
+      archiveFile: map['archiveFile'] as String?,
+      smartModeEnabled: map['smartModeEnabled'] ?? false,
+      lastFormatType: map['lastFormatType'] as String?,
+      lastQualityId: map['lastQualityId'] as String?,
     );
   }
 

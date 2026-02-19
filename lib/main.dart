@@ -9,6 +9,8 @@ import 'services/extraction_service.dart';
 import 'services/native_service.dart';
 import 'services/cookie_service.dart';
 import 'screens/login_webview_screen.dart';
+import 'screens/settings_screen.dart';
+import 'screens/browser_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -96,14 +98,63 @@ class _MyHomePageState extends State<MyHomePage> {
     if (_urlController.text.isEmpty) return;
     setState(() => _isLoading = true);
     final extService = Provider.of<ExtractionService>(context, listen: false);
+    final configService = Provider.of<ConfigService>(context, listen: false);
     final meta = await extService.getMetadata(_urlController.text);
     setState(() {
       _currentMetadata = meta;
       _isLoading = false;
       if (meta != null && meta.formats.isNotEmpty) {
-        _selectedQuality = meta.formats.first;
+        // Apply Smart Mode if enabled
+        if (configService.config.smartModeEnabled &&
+            configService.config.lastFormatType != null &&
+            configService.config.lastQualityId != null) {
+          _selectedFormatType = configService.config.lastFormatType!;
+          final lastId = configService.config.lastQualityId;
+          _selectedQuality = meta.formats.firstWhere(
+            (f) => f.formatId == lastId || f.resolution == lastId,
+            orElse: () => meta.formats.first,
+          );
+
+          // Auto-start download
+          _startDownload(context);
+        } else {
+          _selectedQuality = meta.formats.first;
+        }
       }
     });
+  }
+
+  void _startDownload(BuildContext context) {
+    if (_currentMetadata == null || _selectedQuality == null) return;
+
+    final downloadService = Provider.of<DownloadService>(
+      context,
+      listen: false,
+    );
+    final configService = Provider.of<ConfigService>(context, listen: false);
+
+    // Save settings if successful
+    configService.setLastSettings(
+      _selectedFormatType,
+      _selectedQuality!.formatId ?? _selectedQuality!.resolution ?? 'best',
+    );
+
+    downloadService.downloadFile(
+      _getDownloadUrl(),
+      fileName: '${_currentMetadata!.title}.${_selectedQuality?.ext ?? 'mp4'}',
+      downloadSubtitles: _downloadSubtitles,
+      downloadThumbnail: _downloadThumbnail,
+      videoId: _currentMetadata!.videoId,
+      isYoutube: _currentMetadata!.isYoutube,
+    );
+
+    if (configService.config.smartModeEnabled) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Smart Mode: Downloading ${_currentMetadata!.title}'),
+        ),
+      );
+    }
   }
 
   Future<void> _pasteFromClipboard() async {
@@ -148,6 +199,26 @@ class _MyHomePageState extends State<MyHomePage> {
         centerTitle: true,
         actions: [
           IconButton(
+            icon: Icon(
+              configService.config.smartModeEnabled
+                  ? Icons.tips_and_updates
+                  : Icons.tips_and_updates_outlined,
+            ),
+            tooltip: 'Smart Mode',
+            color: configService.config.smartModeEnabled ? Colors.amber : null,
+            onPressed: () => configService.setSmartMode(
+              !configService.config.smartModeEnabled,
+            ),
+          ),
+          IconButton(
+            icon: const Icon(Icons.public),
+            tooltip: 'Browser',
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const BrowserScreen()),
+            ),
+          ),
+          IconButton(
             icon: const Icon(Icons.login),
             tooltip: 'Login (Cookies)',
             onPressed: () => Navigator.push(
@@ -161,7 +232,10 @@ class _MyHomePageState extends State<MyHomePage> {
           ),
           IconButton(
             icon: const Icon(Icons.settings),
-            onPressed: () {}, // TODO
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const SettingsScreen()),
+            ),
           ),
         ],
       ),
@@ -348,17 +422,7 @@ class _MyHomePageState extends State<MyHomePage> {
               ),
               const SizedBox(height: 16),
               FilledButton.icon(
-                onPressed: () {
-                  downloadService.downloadFile(
-                    _getDownloadUrl(),
-                    fileName:
-                        '${_currentMetadata!.title}.${_selectedQuality?.ext ?? 'mp4'}',
-                    downloadSubtitles: _downloadSubtitles,
-                    downloadThumbnail: _downloadThumbnail,
-                    videoId: _currentMetadata!.videoId,
-                    isYoutube: _currentMetadata!.isYoutube,
-                  );
-                },
+                onPressed: () => _startDownload(context),
                 icon: const Icon(Icons.download),
                 label: const Text('Start Download'),
                 style: FilledButton.styleFrom(

@@ -57,4 +57,14 @@ class ConfigService extends ChangeNotifier {
   Future<void> setThemeMode(String mode) async {
     await updateConfig(_config.copyWith(themeMode: mode));
   }
+
+  Future<void> setSmartMode(bool enabled) async {
+    await updateConfig(_config.copyWith(smartModeEnabled: enabled));
+  }
+
+  Future<void> setLastSettings(String formatType, String qualityId) async {
+    await updateConfig(
+      _config.copyWith(lastFormatType: formatType, lastQualityId: qualityId),
+    );
+  }
 }

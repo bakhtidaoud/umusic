@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import 'package:provider/provider.dart';
+import 'package:google_fonts/google_fonts.dart';
 import '../services/cookie_service.dart';
 
 class BrowserScreen extends StatefulWidget {
@@ -33,13 +34,11 @@ class _BrowserScreenState extends State<BrowserScreen> {
           },
           onPageFinished: (url) async {
             setState(() => _isLoading = false);
-            // Capture cookies on page finish
             final cookieService = Provider.of<CookieService>(
               context,
               listen: false,
             );
-            final uri = Uri.parse(url);
-            await cookieService.extractAndSaveCookies(uri);
+            await cookieService.extractAndSaveCookies(Uri.parse(url));
           },
         ),
       )
@@ -56,24 +55,86 @@ class _BrowserScreenState extends State<BrowserScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: TextField(
-          controller: _urlController,
-          decoration: const InputDecoration(
-            hintText: 'Search or enter URL',
-            border: InputBorder.none,
+    return Column(
+      children: [
+        _buildAddressBar(context),
+        if (_isLoading) const LinearProgressIndicator(minHeight: 2),
+        Expanded(
+          child: ClipRRect(
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+            child: WebViewWidget(controller: _controller),
           ),
-          onSubmitted: (_) => _loadUrl(),
         ),
-        actions: [
+        _buildControls(context),
+      ],
+    );
+  }
+
+  Widget _buildAddressBar(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.all(12.0),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        decoration: BoxDecoration(
+          color: colorScheme.surfaceVariant.withOpacity(0.5),
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: TextField(
+                controller: _urlController,
+                style: GoogleFonts.outfit(fontSize: 14),
+                decoration: const InputDecoration(
+                  hintText: 'Search or enter URL',
+                  border: InputBorder.none,
+                ),
+                onSubmitted: (_) => _loadUrl(),
+              ),
+            ),
+            IconButton(
+              icon: const Icon(Icons.refresh_rounded, size: 20),
+              onPressed: () => _controller.reload(),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildControls(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.only(bottom: 20, top: 10),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surface,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, -5),
+          ),
+        ],
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+        children: [
           IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: () => _controller.reload(),
+            icon: const Icon(Icons.arrow_back_ios_new_rounded),
+            onPressed: () async {
+              if (await _controller.canGoBack()) await _controller.goBack();
+            },
           ),
           IconButton(
-            icon: const Icon(Icons.cookie),
-            tooltip: 'Capture Cookies Now',
+            icon: const Icon(Icons.arrow_forward_ios_rounded),
+            onPressed: () async {
+              if (await _controller.canGoForward())
+                await _controller.goForward();
+            },
+          ),
+          IconButton(
+            icon: const Icon(Icons.cookie_rounded),
+            tooltip: 'Capture Cookies',
             onPressed: () async {
               final url = await _controller.currentUrl();
               if (url != null) {
@@ -82,51 +143,21 @@ class _BrowserScreenState extends State<BrowserScreen> {
                   listen: false,
                 );
                 await cookieService.extractAndSaveCookies(Uri.parse(url));
-                if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Cookies captured and saved!'),
-                    ),
-                  );
-                }
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Cookies captured!'),
+                    behavior: SnackBarBehavior.floating,
+                  ),
+                );
               }
             },
           ),
+          IconButton(
+            icon: const Icon(Icons.home_rounded),
+            onPressed: () =>
+                _controller.loadRequest(Uri.parse('https://www.google.com')),
+          ),
         ],
-      ),
-      body: Column(
-        children: [
-          if (_isLoading) const LinearProgressIndicator(),
-          Expanded(child: WebViewWidget(controller: _controller)),
-        ],
-      ),
-      bottomNavigationBar: BottomAppBar(
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-          children: [
-            IconButton(
-              icon: const Icon(Icons.arrow_back),
-              onPressed: () async {
-                if (await _controller.canGoBack()) {
-                  await _controller.goBack();
-                }
-              },
-            ),
-            IconButton(
-              icon: const Icon(Icons.arrow_forward),
-              onPressed: () async {
-                if (await _controller.canGoForward()) {
-                  await _controller.goForward();
-                }
-              },
-            ),
-            IconButton(
-              icon: const Icon(Icons.home),
-              onPressed: () =>
-                  _controller.loadRequest(Uri.parse('https://www.google.com')),
-            ),
-          ],
-        ),
       ),
     );
   }

@@ -71,7 +71,7 @@ class DownloadService extends ChangeNotifier {
   Future<void> _initNotifications() async {
     const androidInit = AndroidInitializationSettings('@mipmap/ic_launcher');
     const initSettings = InitializationSettings(android: androidInit);
-    await _notifications.initialize(initSettings);
+    await _notifications.initialize(settings: initSettings);
   }
 
   void updateDownloadFolder(String? path) {

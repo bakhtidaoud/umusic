@@ -14,7 +14,7 @@ dependencies:
   cupertino_icons: ^1.0.8
   path_provider: ^2.1.5
   dio: ^5.9.1
-  youtube_explode_dart: ^2.5.3
+  youtube_explode_dart: ^3.0.5
   shared_preferences: ^2.5.4
   flutter_local_notifications: ^20.1.0
   permission_handler: ^12.0.1
@@ -47,3 +47,6 @@ flutter:
   uses-material-design: true
   assets:
     - assets/app_icon.svg
+
+dependency_overrides:
+  youtube_explode_dart: ^3.0.5

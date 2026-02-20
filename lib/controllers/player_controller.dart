@@ -54,8 +54,30 @@ class PlayerController extends GetxController {
         podController!.dispose();
       }
 
+      // Manually extract stream for better reliability
+      final videoId = video.id.value;
+      final manifest = await _yt.videos.streamsClient.getManifest(videoId);
+
+      // Get muxed streams for video + audio
+      final muxedStreams = manifest.muxed.toList();
+      if (muxedStreams.isEmpty) {
+        throw Exception("No playable muxed streams found");
+      }
+
+      // Map streams to PodPlayer's format
+      final List<VideoQalityUrls> qualityUrls = [];
+      for (var s in muxedStreams) {
+        final q = s.videoQuality.toString().replaceAll(RegExp(r'[^0-9]'), '');
+        qualityUrls.add(
+          VideoQalityUrls(
+            quality: int.tryParse(q) ?? 360,
+            url: s.url.toString(),
+          ),
+        );
+      }
+
       podController = PodPlayerController(
-        playVideoFrom: PlayVideoFrom.youtube(videoUrl),
+        playVideoFrom: PlayVideoFrom.networkQualityUrls(videoUrls: qualityUrls),
         podPlayerConfig: PodPlayerConfig(autoPlay: true, isLooping: false),
       );
 

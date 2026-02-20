@@ -3,6 +3,7 @@ import 'package:get/get.dart';
 import 'package:pod_player/pod_player.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../controllers/player_controller.dart';
+import '../controllers/download_controller.dart';
 import '../utils/design_system.dart';
 
 class VideoPlayerScreen extends StatefulWidget {
@@ -143,7 +144,26 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                         children: [
                           _buildAction(Icons.thumb_up_rounded, 'Like'),
                           _buildAction(Icons.share_rounded, 'Share'),
-                          _buildAction(Icons.download_rounded, 'Download'),
+                          GestureDetector(
+                            onTap: () {
+                              final downloadController =
+                                  Get.find<DownloadController>();
+                              downloadController.downloadFile(
+                                widget.videoUrl,
+                                fileName: "${controller.videoTitle.value}.mp4",
+                                isYoutube: true,
+                              );
+                              Get.snackbar(
+                                'Download Started',
+                                'Added ${controller.videoTitle.value} to queue',
+                                snackPosition: SnackPosition.BOTTOM,
+                              );
+                            },
+                            child: _buildAction(
+                              Icons.download_rounded,
+                              'Download',
+                            ),
+                          ),
                           _buildAction(Icons.playlist_add_rounded, 'Save'),
                         ],
                       ),

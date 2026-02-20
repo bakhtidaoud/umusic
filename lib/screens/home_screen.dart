@@ -33,6 +33,34 @@ class HomeScreen extends StatelessWidget {
                     if (controller.isLoading.value) {
                       return _buildShimmerLoading();
                     }
+                    if (controller.videos.isEmpty &&
+                        controller.shorts.isEmpty) {
+                      return Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.search_off_rounded,
+                              size: 80,
+                              color: Colors.white10,
+                            ),
+                            SizedBox(height: 16),
+                            Text(
+                              'No videos found',
+                              style: GoogleFonts.outfit(
+                                color: Colors.white38,
+                                fontSize: 18,
+                              ),
+                            ),
+                            SizedBox(height: 8),
+                            ElevatedButton(
+                              onPressed: () => controller.fetchVideos(),
+                              child: Text('Try Again'),
+                            ),
+                          ],
+                        ),
+                      );
+                    }
                     return _buildMainList(controller);
                   }),
                 ),

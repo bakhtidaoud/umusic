@@ -5,6 +5,7 @@ import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:system_tray/system_tray.dart';
 import 'package:just_audio_background/just_audio_background.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'dart:io';
 
 import 'services/native_service.dart';
@@ -30,12 +31,11 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   // Initialize Background Audio
-  /*
   await JustAudioBackground.init(
-    androidNotificationChannelId: 'com.ryanheise.bg_demo.channel.audio',
+    androidNotificationChannelId: 'com.example.umusic.channel.audio',
     androidNotificationChannelName: 'Audio playback',
     androidNotificationOngoing: true,
-  );*/
+  );
 
   final prefs = await SharedPreferences.getInstance();
 
@@ -145,7 +145,28 @@ class _MyHomePageState extends State<MyHomePage> {
   @override
   void initState() {
     super.initState();
+    _checkPermissions();
     _initServices();
+  }
+
+  Future<void> _checkPermissions() async {
+    if (Platform.isAndroid) {
+      // Request storage and notification permissions
+      Map<Permission, PermissionStatus> statuses = await [
+        Permission.storage,
+        Permission.notification,
+        // For Android 13+ (API 33+)
+        Permission.manageExternalStorage,
+      ].request();
+
+      if (statuses[Permission.storage]!.isDenied) {
+        Get.snackbar(
+          'Permission Needed',
+          'Storage permission is required to download and play music.',
+          snackPosition: SnackPosition.BOTTOM,
+        );
+      }
+    }
   }
 
   void _initServices() {

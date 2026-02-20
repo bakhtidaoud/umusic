@@ -214,8 +214,22 @@ class DownloadController extends GetxController {
         int lastDownloaded = 0;
         DateTime lastUpdateTime = DateTime.now();
 
+        String downloadUrl = task.url;
+        if (task.isYoutube) {
+          try {
+            final vid = task.videoId ?? VideoId(task.url).value;
+            final manifest = await _yt.videos.streamsClient.getManifest(vid);
+            final streamInfo = manifest.muxed.withHighestBitrate();
+            downloadUrl = streamInfo.url.toString();
+          } catch (e) {
+            debugPrint('Error resolving YouTube stream for download: $e');
+            // If failed to resolve muxed, try to get anything or just fail
+            throw Exception("Could not resolve YouTube stream: $e");
+          }
+        }
+
         final response = await _dio.get(
-          task.url,
+          downloadUrl,
           options: Options(responseType: ResponseType.stream),
           cancelToken: task.cancelToken,
         );

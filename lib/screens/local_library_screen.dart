@@ -6,6 +6,7 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_staggered_animations/flutter_staggered_animations.dart';
 import 'dart:math' as math;
 import '../controllers/library_controller.dart';
+import '../controllers/player_controller.dart';
 import '../utils/design_system.dart';
 import 'video_player_screen.dart';
 
@@ -14,12 +15,15 @@ class LocalLibraryScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final controller = Get.put(LibraryController());
+    final controller = Get.find<LibraryController>();
+    final playerController = Get.find<PlayerController>();
     final TextEditingController searchTeco = TextEditingController();
+
     return Scaffold(
       body: Column(
         children: [
           _buildSearchBar(context, controller, searchTeco),
+          _buildFilterTabs(context, controller),
           Expanded(
             child: RefreshIndicator(
               color: UDesign.primary,
@@ -36,7 +40,10 @@ class LocalLibraryScreen extends StatelessWidget {
 
                 return AnimationLimiter(
                   child: ListView.builder(
-                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 20,
+                      vertical: 10,
+                    ),
                     itemCount: controller.filteredFiles.length,
                     itemBuilder: (context, index) {
                       final file = controller.filteredFiles[index];
@@ -46,7 +53,12 @@ class LocalLibraryScreen extends StatelessWidget {
                         child: SlideAnimation(
                           verticalOffset: 50.0,
                           child: FadeInAnimation(
-                            child: _buildFileCard(context, file, controller),
+                            child: _buildFileCard(
+                              context,
+                              file,
+                              controller,
+                              playerController,
+                            ),
                           ),
                         ),
                       );
@@ -61,6 +73,56 @@ class LocalLibraryScreen extends StatelessWidget {
     );
   }
 
+  Widget _buildFilterTabs(BuildContext context, LibraryController controller) {
+    return Obx(() {
+      return Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+        child: Row(
+          children: [
+            _buildTabItem(context, 'All', LibraryFilter.all, controller),
+            const SizedBox(width: 8),
+            _buildTabItem(context, 'Videos', LibraryFilter.video, controller),
+            const SizedBox(width: 8),
+            _buildTabItem(context, 'Music', LibraryFilter.audio, controller),
+          ],
+        ),
+      );
+    });
+  }
+
+  Widget _buildTabItem(
+    BuildContext context,
+    String title,
+    LibraryFilter filter,
+    LibraryController controller,
+  ) {
+    bool isSelected = controller.currentFilter.value == filter;
+    bool isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return GestureDetector(
+      onTap: () => controller.setFilter(filter),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? UDesign.primary
+              : (isDark ? Colors.white12 : Colors.black12),
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Text(
+          title,
+          style: GoogleFonts.outfit(
+            color: isSelected
+                ? Colors.white
+                : (isDark ? UDesign.textMedDark : UDesign.textMedLight),
+            fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+            fontSize: 13,
+          ),
+        ),
+      ),
+    ).animate().scale(delay: 100.ms, duration: 200.ms);
+  }
+
   Widget _buildSearchBar(
     BuildContext context,
     LibraryController controller,
@@ -68,7 +130,7 @@ class LocalLibraryScreen extends StatelessWidget {
   ) {
     bool isDark = Theme.of(context).brightness == Brightness.dark;
     return Padding(
-      padding: const EdgeInsets.all(20.0),
+      padding: const EdgeInsets.fromLTRB(20, 20, 20, 10),
       child: UDesign.glassLayer(
         borderRadius: BorderRadius.circular(24),
         child: Container(
@@ -80,7 +142,7 @@ class LocalLibraryScreen extends StatelessWidget {
               color: isDark ? UDesign.textHighDark : UDesign.textHighLight,
             ),
             decoration: InputDecoration(
-              hintText: 'Search local library...',
+              hintText: 'Search your library...',
               hintStyle: GoogleFonts.outfit(
                 color: isDark ? UDesign.textMedDark : UDesign.textMedLight,
               ),
@@ -108,22 +170,19 @@ class LocalLibraryScreen extends StatelessWidget {
     BuildContext context,
     LocalFile file,
     LibraryController controller,
+    PlayerController playerController,
   ) {
     final isVideo = ['.mp4', '.mkv', '.webm'].contains(file.extension);
     bool isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Padding(
-      padding: const EdgeInsets.only(bottom: 16.0),
+      padding: const EdgeInsets.only(bottom: 12.0),
       child: InkWell(
         onTap: () {
           if (isVideo) {
             Get.to(() => VideoPlayerScreen(videoUrl: file.path));
           } else {
-            Get.snackbar(
-              'Audio Player',
-              'Audio playback coming soon!',
-              snackPosition: SnackPosition.BOTTOM,
-            );
+            playerController.playLocalFile(file);
           }
         },
         onLongPress: () => _confirmDelete(context, file, controller),
@@ -146,7 +205,7 @@ class LocalLibraryScreen extends StatelessWidget {
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: GoogleFonts.outfit(
-                          fontSize: 16,
+                          fontSize: 15,
                           fontWeight: FontWeight.w600,
                           color: isDark
                               ? UDesign.textHighDark
@@ -157,7 +216,7 @@ class LocalLibraryScreen extends StatelessWidget {
                       Text(
                         '${_formatSize(file.size)} • ${file.extension.toUpperCase().replaceAll('.', '')}',
                         style: GoogleFonts.outfit(
-                          fontSize: 13,
+                          fontSize: 12,
                           color: isDark
                               ? UDesign.textMedDark
                               : UDesign.textMedLight,
@@ -166,11 +225,19 @@ class LocalLibraryScreen extends StatelessWidget {
                     ],
                   ),
                 ),
-                Icon(
-                  isVideo
-                      ? Icons.play_circle_outline_rounded
-                      : Icons.audiotrack_rounded,
-                  color: UDesign.primary.withOpacity(0.6),
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: UDesign.primary.withOpacity(0.1),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    isVideo
+                        ? Icons.play_arrow_rounded
+                        : Icons.music_note_rounded,
+                    color: UDesign.primary,
+                    size: 20,
+                  ),
                 ),
               ],
             ),
@@ -183,8 +250,8 @@ class LocalLibraryScreen extends StatelessWidget {
   Widget _buildThumbnail(BuildContext context, LocalFile file, bool isVideo) {
     bool isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
-      width: 80,
-      height: 60,
+      width: 70,
+      height: 50,
       decoration: BoxDecoration(
         color: Theme.of(context).colorScheme.surface,
         borderRadius: BorderRadius.circular(12),
@@ -198,6 +265,7 @@ class LocalLibraryScreen extends StatelessWidget {
                     ? Icons.movie_creation_rounded
                     : Icons.music_note_rounded,
                 color: isDark ? Colors.white24 : Colors.black.withOpacity(0.24),
+                size: 24,
               ),
       ),
     );

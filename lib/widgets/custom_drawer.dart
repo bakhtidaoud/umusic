@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import '../utils/design_system.dart';
@@ -108,11 +107,7 @@ class CustomDrawer extends StatelessWidget {
                   color: isDark ? Colors.white12 : Colors.black12,
                 ),
               ),
-              child: SvgPicture.asset(
-                'assets/app_icon.svg',
-                width: 48,
-                height: 48,
-              ),
+              child: Image.asset('assets/app_icon.png', width: 48, height: 48),
             ),
           ).animate().shimmer(duration: const Duration(seconds: 2)),
           const SizedBox(width: 20),

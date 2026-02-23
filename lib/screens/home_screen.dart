@@ -28,6 +28,12 @@ class HomeScreen extends StatelessWidget {
               _buildSliverCategories(controller),
               SliverToBoxAdapter(
                 child: Obx(() {
+                  final networkService = Get.find<NetworkService>();
+                  if (!networkService.isConnected.value &&
+                      controller.videos.isEmpty) {
+                    return _buildOfflineContent(context);
+                  }
+
                   if (controller.isLoading.value) {
                     return _buildShimmerLoading(context);
                   }
@@ -44,7 +50,14 @@ class HomeScreen extends StatelessWidget {
                   );
                 }),
               ),
-              Obx(() => _buildVideoGrid(context, controller)),
+              Obx(() {
+                final networkService = Get.find<NetworkService>();
+                if (!networkService.isConnected.value &&
+                    controller.videos.isEmpty) {
+                  return const SliverToBoxAdapter(child: SizedBox.shrink());
+                }
+                return _buildVideoGrid(context, controller);
+              }),
               const SliverToBoxAdapter(child: SizedBox(height: 100)),
             ],
           ),
@@ -109,6 +122,13 @@ class HomeScreen extends StatelessWidget {
       pinned: true,
       elevation: 0,
       backgroundColor: Colors.transparent,
+      leading: IconButton(
+        icon: Icon(
+          Icons.menu_rounded,
+          color: isDark ? Colors.white : Colors.black87,
+        ),
+        onPressed: () => Scaffold.of(context).openDrawer(),
+      ),
       flexibleSpace: FlexibleSpaceBar(
         background: Container(
           decoration: BoxDecoration(
@@ -588,5 +608,72 @@ class HomeScreen extends StatelessWidget {
         ),
       ),
     ).animate().fadeIn().slideY(begin: 0.2);
+  }
+
+  Widget _buildOfflineContent(BuildContext context) {
+    bool isDark = Theme.of(context).brightness == Brightness.dark;
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 80, horizontal: 40),
+      child: Center(
+        child: Column(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(32),
+              decoration: BoxDecoration(
+                color: UDesign.primary.withOpacity(0.1),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.wifi_off_rounded,
+                size: 64,
+                color: UDesign.primary,
+              ),
+            ),
+            const SizedBox(height: 32),
+            Text(
+              'No Connection',
+              style: GoogleFonts.outfit(
+                fontSize: 28,
+                fontWeight: FontWeight.bold,
+                color: isDark ? UDesign.textHighDark : UDesign.textHighLight,
+              ),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'It seems you are offline. You can still enjoy your downloaded content in the library.',
+              textAlign: TextAlign.center,
+              style: GoogleFonts.outfit(
+                fontSize: 16,
+                color: isDark ? UDesign.textMedDark : UDesign.textMedLight,
+                height: 1.5,
+              ),
+            ),
+            const SizedBox(height: 40),
+            ElevatedButton.icon(
+              onPressed: () {
+                Get.find<PageController>().jumpToPage(2);
+              },
+              icon: const Icon(
+                Icons.library_music_rounded,
+                color: Colors.black,
+              ),
+              label: const Text('See My Downloads'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: UDesign.primary,
+                foregroundColor: Colors.black,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 32,
+                  vertical: 18,
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                elevation: 0,
+              ),
+            ).animate().shimmer(delay: const Duration(seconds: 1), duration: const Duration(seconds: 2)),
+          ],
+        ),
+      ),
+    ).animate().fadeIn(duration: const Duration(milliseconds: 800));
   }
 }

@@ -4,6 +4,7 @@ import 'package:pod_player/pod_player.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../controllers/player_controller.dart';
 import '../controllers/download_controller.dart';
+import '../widgets/download_quality_sheet.dart';
 import '../utils/design_system.dart';
 
 class VideoPlayerScreen extends StatefulWidget {
@@ -16,6 +17,7 @@ class VideoPlayerScreen extends StatefulWidget {
 
 class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
   late final PlayerController controller;
+  bool _isDescriptionExpanded = false;
 
   @override
   void initState() {
@@ -185,38 +187,54 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceAround,
                         children: [
-                          _buildAction(context, Icons.thumb_up_rounded, 'Like'),
-                          _buildAction(context, Icons.share_rounded, 'Share'),
-                          GestureDetector(
-                            onTap: () {
-                              final downloadController =
-                                  Get.find<DownloadController>();
-                              downloadController.downloadFile(
-                                widget.videoUrl,
-                                fileName: "${controller.videoTitle.value}.mp4",
-                                isYoutube: true,
-                              );
-                              Get.snackbar(
-                                'Download Started',
-                                'Added ${controller.videoTitle.value} to queue',
-                                snackPosition: SnackPosition.BOTTOM,
-                              );
-                            },
-                            child: _buildAction(
-                              context,
-                              Icons.download_rounded,
-                              'Download',
+                          _buildAction(
+                            context,
+                            controller.isLiked.value
+                                ? Icons.thumb_up_rounded
+                                : Icons.thumb_up_outlined,
+                            'Like',
+                            isActive: controller.isLiked.value,
+                            onTap: () => controller.toggleLike(),
+                          ),
+                          _buildAction(
+                            context,
+                            Icons.share_rounded,
+                            'Share',
+                            onTap: () => Get.snackbar(
+                              'Share',
+                              'Sharing link: ${widget.videoUrl}',
                             ),
                           ),
                           _buildAction(
                             context,
-                            Icons.playlist_add_rounded,
+                            Icons.download_rounded,
+                            'Download',
+                            onTap: () {
+                              Get.bottomSheet(
+                                DownloadQualitySheet(
+                                  url: widget.videoUrl,
+                                  title: controller.videoTitle.value,
+                                ),
+                                isScrollControlled: true,
+                              );
+                            },
+                          ),
+                          _buildAction(
+                            context,
+                            controller.isSaved.value
+                                ? Icons.playlist_add_check_rounded
+                                : Icons.playlist_add_rounded,
                             'Save',
+                            isActive: controller.isSaved.value,
+                            onTap: () => controller.toggleSave(),
                           ),
                         ],
                       ),
+                      const SizedBox(height: 24),
+                      // Video Description
+                      _buildDescription(context, isDark),
                       Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 32),
+                        padding: const EdgeInsets.symmetric(vertical: 24),
                         child: Divider(
                           color: isDark
                               ? Colors.white10
@@ -345,31 +363,133 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
     );
   }
 
-  Widget _buildAction(BuildContext context, IconData icon, String label) {
+  Widget _buildAction(
+    BuildContext context,
+    IconData icon,
+    String label, {
+    VoidCallback? onTap,
+    bool isActive = false,
+  }) {
     bool isDark = Theme.of(context).brightness == Brightness.dark;
-    return Column(
-      children: [
-        Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: isDark
-                ? Colors.white.withOpacity(0.05)
-                : Colors.black.withOpacity(0.05),
-            shape: BoxShape.circle,
-          ),
-          child: Icon(
-            icon,
-            color: isDark ? Colors.white : Colors.black87,
-            size: 22,
-          ),
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(20),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        child: Column(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: isActive
+                    ? UDesign.primary.withOpacity(0.2)
+                    : (isDark
+                          ? Colors.white.withOpacity(0.05)
+                          : Colors.black.withOpacity(0.05)),
+                shape: BoxShape.circle,
+                border: isActive
+                    ? Border.all(
+                        color: UDesign.primary.withOpacity(0.5),
+                        width: 1.5,
+                      )
+                    : null,
+              ),
+              child: Icon(
+                icon,
+                color: isActive
+                    ? UDesign.primary
+                    : (isDark ? Colors.white : Colors.black87),
+                size: 22,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              label,
+              style: GoogleFonts.outfit(
+                color: isActive
+                    ? UDesign.primary
+                    : (isDark ? Colors.white60 : Colors.black54),
+                fontSize: 12,
+                fontWeight: isActive ? FontWeight.bold : FontWeight.w500,
+              ),
+            ),
+          ],
         ),
-        const SizedBox(height: 8),
-        Text(
-          label,
-          style: GoogleFonts.outfit(
-            color: isDark ? Colors.white60 : Colors.black54,
-            fontSize: 12,
-            fontWeight: FontWeight.w500,
+      ),
+    );
+  }
+
+  Widget _buildDescription(BuildContext context, bool isDark) {
+    if (controller.videoDescription.value.isEmpty)
+      return const SizedBox.shrink();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        InkWell(
+          onTap: () {
+            setState(() {
+              _isDescriptionExpanded = !_isDescriptionExpanded;
+            });
+          },
+          child: Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: isDark
+                  ? Colors.white.withOpacity(0.03)
+                  : Colors.black.withOpacity(0.03),
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Text(
+                      'Description',
+                      style: GoogleFonts.outfit(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14,
+                        color: isDark ? Colors.white70 : Colors.black87,
+                      ),
+                    ),
+                    const Spacer(),
+                    Icon(
+                      _isDescriptionExpanded
+                          ? Icons.keyboard_arrow_up
+                          : Icons.keyboard_arrow_down,
+                      size: 20,
+                      color: isDark ? Colors.white38 : Colors.black38,
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  controller.videoDescription.value,
+                  maxLines: _isDescriptionExpanded ? null : 3,
+                  overflow: _isDescriptionExpanded
+                      ? TextOverflow.visible
+                      : TextOverflow.ellipsis,
+                  style: GoogleFonts.outfit(
+                    fontSize: 13,
+                    color: isDark ? Colors.white54 : Colors.black54,
+                    height: 1.5,
+                  ),
+                ),
+                if (!_isDescriptionExpanded)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 4),
+                    child: Text(
+                      'Show more',
+                      style: GoogleFonts.outfit(
+                        fontSize: 13,
+                        color: UDesign.primary,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
           ),
         ),
       ],

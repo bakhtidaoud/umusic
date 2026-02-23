@@ -3,7 +3,6 @@ import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_animate/flutter_animate.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 import '../services/extraction_service.dart';
 import '../controllers/config_controller.dart';
 import '../controllers/download_controller.dart';
@@ -91,7 +90,6 @@ class _DownloaderScreenState extends State<DownloaderScreen> {
   @override
   Widget build(BuildContext context) {
     final downloadController = Get.find<DownloadController>();
-    bool isDark = Theme.of(context).brightness == Brightness.dark;
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
@@ -123,14 +121,7 @@ class _DownloaderScreenState extends State<DownloaderScreen> {
                     child: Center(
                       child: Opacity(
                         opacity: 0.1,
-                        child: SvgPicture.asset(
-                          'assets/app_icon.svg',
-                          width: 200,
-                          colorFilter: ColorFilter.mode(
-                            isDark ? Colors.white : Colors.black,
-                            BlendMode.srcIn,
-                          ),
-                        ),
+                        child: Image.asset('assets/app_icon.png', width: 200),
                       ),
                     ),
                   ),

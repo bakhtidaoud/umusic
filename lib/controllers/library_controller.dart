@@ -5,6 +5,8 @@ import 'package:video_thumbnail/video_thumbnail.dart';
 import 'package:path/path.dart' as p;
 import 'config_controller.dart';
 
+enum LibraryFilter { all, video, audio }
+
 class LocalFile {
   final String path;
   final String name;
@@ -27,6 +29,8 @@ class LibraryController extends GetxController {
   var allFiles = <LocalFile>[].obs;
   var filteredFiles = <LocalFile>[].obs;
   var isLoading = false.obs;
+  var currentFilter = LibraryFilter.all.obs;
+  String _currentSearchQuery = '';
 
   final String _thumbnailSubDir = 'library_thumbnails';
 
@@ -34,6 +38,11 @@ class LibraryController extends GetxController {
   void onInit() {
     super.onInit();
     scanFiles();
+  }
+
+  void setFilter(LibraryFilter filter) {
+    currentFilter.value = filter;
+    _applyFilters();
   }
 
   Future<void> scanFiles() async {
@@ -97,7 +106,7 @@ class LibraryController extends GetxController {
       files.sort((a, b) => b.modified.compareTo(a.modified));
 
       allFiles.value = files;
-      filteredFiles.value = files;
+      _applyFilters();
     } catch (e) {
       Get.snackbar('Error', 'Failed to scan library: $e');
     } finally {
@@ -130,13 +139,36 @@ class LibraryController extends GetxController {
   }
 
   void search(String query) {
-    if (query.isEmpty) {
-      filteredFiles.value = allFiles;
-    } else {
-      filteredFiles.value = allFiles
-          .where((f) => f.name.toLowerCase().contains(query.toLowerCase()))
+    _currentSearchQuery = query;
+    _applyFilters();
+  }
+
+  void _applyFilters() {
+    var results = allFiles.toList();
+
+    // Type filter
+    if (currentFilter.value == LibraryFilter.video) {
+      results = results
+          .where((f) => ['.mp4', '.mkv', '.webm'].contains(f.extension))
+          .toList();
+    } else if (currentFilter.value == LibraryFilter.audio) {
+      results = results
+          .where((f) => ['.mp3', '.m4a', '.wav'].contains(f.extension))
           .toList();
     }
+
+    // Search query
+    if (_currentSearchQuery.isNotEmpty) {
+      results = results
+          .where(
+            (f) => f.name.toLowerCase().contains(
+              _currentSearchQuery.toLowerCase(),
+            ),
+          )
+          .toList();
+    }
+
+    filteredFiles.value = results;
   }
 
   Future<void> deleteFile(LocalFile file) async {
@@ -150,7 +182,7 @@ class LibraryController extends GetxController {
       }
 
       allFiles.removeWhere((element) => element.path == file.path);
-      filteredFiles.removeWhere((element) => element.path == file.path);
+      _applyFilters();
 
       Get.snackbar('Success', 'File deleted from storage');
     } catch (e) {

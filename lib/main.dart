@@ -25,7 +25,9 @@ import 'screens/subscriptions_screen.dart';
 import 'screens/home_screen.dart';
 import 'screens/downloader_screen.dart';
 import 'screens/local_library_screen.dart';
+import 'screens/splash_screen.dart';
 import 'widgets/mini_player.dart';
+import 'widgets/custom_drawer.dart';
 import 'utils/design_system.dart';
 
 void main() async {
@@ -104,7 +106,14 @@ class MyApp extends StatelessWidget {
         darkTheme: UDesign.premiumDark.copyWith(
           textTheme: GoogleFonts.outfitTextTheme(ThemeData.dark().textTheme),
         ),
-        home: const MyHomePage(title: 'uMusic'),
+        initialRoute: '/',
+        getPages: [
+          GetPage(name: '/', page: () => const SplashScreen()),
+          GetPage(
+            name: '/home',
+            page: () => const MyHomePage(title: 'uMusic'),
+          ),
+        ],
       );
     });
   }
@@ -130,8 +139,9 @@ class MyHomePage extends StatefulWidget {
 }
 
 class _MyHomePageState extends State<MyHomePage> {
-  final PageController _pageController = PageController();
+  final PageController _pageController = Get.put(PageController());
   final String? _prefetchedUrl = null;
+  int _selectedIndex = 0;
 
   @override
   void initState() {
@@ -220,6 +230,15 @@ class _MyHomePageState extends State<MyHomePage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      drawer: CustomDrawer(
+        selectedIndex: _selectedIndex,
+        onDestinationSelected: (index) {
+          setState(() {
+            _selectedIndex = index;
+            _pageController.jumpToPage(index);
+          });
+        },
+      ),
       body: Stack(
         children: [
           PageView(

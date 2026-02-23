@@ -10,6 +10,7 @@ import 'package:youtube_explode_dart/youtube_explode_dart.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:permission_handler/permission_handler.dart';
 import '../services/extraction_service.dart';
+import '../services/native_service.dart';
 import 'library_controller.dart';
 
 enum DownloadStatus { pending, downloading, paused, completed, canceled, error }
@@ -28,8 +29,13 @@ class DownloadTask {
   final bool downloadSubtitles;
   final bool downloadThumbnail;
   final String? videoId;
+  final String? formatId;
+  final String? artist;
+  final String? album;
   var transferRate = 0.0.obs; // bytes per second
   var eta = Rxn<Duration>();
+  var currentAction =
+      'Pending'.obs; // e.g., 'Downloading', 'Muxing', 'Metadata'
 
   DownloadTask({
     required this.url,
@@ -45,8 +51,12 @@ class DownloadTask {
     this.downloadSubtitles = false,
     this.downloadThumbnail = false,
     this.videoId,
+    this.formatId,
+    this.artist,
+    this.album,
     double transferRate = 0.0,
     Rxn<Duration>? eta,
+    String currentAction = 'Pending',
   }) {
     if (errorMessage != null) this.errorMessage = errorMessage;
     if (eta != null) this.eta = eta;
@@ -55,6 +65,7 @@ class DownloadTask {
     this.downloadedBytes.value = downloadedBytes;
     this.totalBytes.value = totalBytes;
     this.transferRate.value = transferRate;
+    this.currentAction.value = currentAction;
   }
 }
 
@@ -121,6 +132,9 @@ class DownloadController extends GetxController {
     bool downloadSubtitles = false,
     bool downloadThumbnail = false,
     String? videoId,
+    String? formatId,
+    String? artist,
+    String? album,
   }) async {
     if (tasks.containsKey(url)) return;
 
@@ -146,6 +160,9 @@ class DownloadController extends GetxController {
       downloadSubtitles: downloadSubtitles,
       downloadThumbnail: downloadThumbnail,
       videoId: videoId,
+      formatId: formatId,
+      artist: artist,
+      album: album,
     );
 
     tasks[url] = task;
@@ -215,7 +232,14 @@ class DownloadController extends GetxController {
         DateTime lastUpdateTime = DateTime.now();
 
         String downloadUrl = task.url;
-        if (task.isYoutube) {
+
+        // Specialized Download logic for YouTube via yt-dlp if format is specified
+        if (task.isYoutube && task.formatId != null) {
+          await _downloadWithYtDlp(task);
+          return;
+        }
+
+        if (task.isYoutube && task.formatId == null) {
           try {
             final vid = task.videoId ?? VideoId(task.url).value;
             final manifest = await _yt.videos.streamsClient.getManifest(vid);
@@ -223,11 +247,11 @@ class DownloadController extends GetxController {
             downloadUrl = streamInfo.url.toString();
           } catch (e) {
             debugPrint('Error resolving YouTube stream for download: $e');
-            // If failed to resolve muxed, try to get anything or just fail
             throw Exception("Could not resolve YouTube stream: $e");
           }
         }
 
+        task.currentAction.value = 'Downloading';
         final response = await _dio.get(
           downloadUrl,
           options: Options(responseType: ResponseType.stream),
@@ -278,10 +302,17 @@ class DownloadController extends GetxController {
         }
 
         await sink.close();
+
+        // Apply Metadata if it's an audio file
+        if (task.artist != null || task.downloadThumbnail) {
+          await _applyMetadata(task);
+        }
+
         task.status.value = DownloadStatus.completed;
         task.progress.value = 1.0;
         task.transferRate.value = 0;
         task.eta.value = null;
+        task.currentAction.value = 'Completed';
 
         _sendNotification(
           task.url.hashCode,
@@ -421,6 +452,107 @@ class DownloadController extends GetxController {
   void onClose() {
     _yt.close();
     super.onClose();
+  }
+
+  Future<void> _downloadWithYtDlp(DownloadTask task) async {
+    try {
+      task.currentAction.value = 'Preparing';
+      final List<String> args = [
+        '-f',
+        task.formatId!,
+        '--no-part',
+        '--newline',
+        '-o',
+        task.savePath,
+        task.url,
+      ];
+
+      _sendNotification(
+        task.url.hashCode,
+        'uMusic: Downloading',
+        'Processing ${task.fileName}...',
+      );
+
+      final result = await NativeService.runCommand(
+        'yt-dlp',
+        args,
+        proxy: _proxy,
+      );
+      if (result != null && result.startsWith('Error')) {
+        throw Exception(result);
+      }
+
+      // Metadata for yt-dlp downloads
+      if (task.artist != null || task.downloadThumbnail) {
+        await _applyMetadata(task);
+      }
+
+      task.status.value = DownloadStatus.completed;
+      task.progress.value = 1.0;
+      task.currentAction.value = 'Completed';
+      _activeDownloads--;
+      _processQueue();
+    } catch (e) {
+      task.status.value = DownloadStatus.error;
+      task.errorMessage.value = e.toString();
+      _activeDownloads--;
+      _processQueue();
+    }
+  }
+
+  Future<void> _applyMetadata(DownloadTask task) async {
+    task.currentAction.value = 'Applying Metadata';
+    try {
+      final ext = p.extension(task.savePath).toLowerCase();
+      final thumbPath = task.savePath.replaceAll(ext, '.jpg');
+
+      if (task.downloadThumbnail && task.videoId != null) {
+        await _downloadThumbnailInternal(task);
+      }
+
+      if (['.mp4', '.mkv', '.mp3', '.m4a', '.opus', '.webm'].contains(ext)) {
+        final tempPath = '${task.savePath}.meta$ext';
+        final List<String> args = ['-i', task.savePath];
+
+        if (File(thumbPath).existsSync()) {
+          args.addAll(['-i', thumbPath, '-map', '0', '-map', '1']);
+          if (ext == '.mp3') {
+            args.addAll([
+              '-c:a',
+              'copy',
+              '-c:v',
+              'copy',
+              '-id3v2_version',
+              '3',
+              '-metadata:s:v',
+              'title="Album cover"',
+              '-metadata:s:v',
+              'comment="Cover (Front)"',
+            ]);
+          } else {
+            args.addAll(['-c', 'copy', '-disposition:v:0', 'attached_pic']);
+          }
+        } else {
+          args.addAll(['-c', 'copy']);
+        }
+
+        if (task.artist != null)
+          args.addAll(['-metadata', 'artist=${task.artist}']);
+        if (task.album != null)
+          args.addAll(['-metadata', 'album=${task.album}']);
+        args.add(tempPath);
+
+        final result = await NativeService.runCommand('ffmpeg', args);
+        if (result != null && !result.startsWith('Error')) {
+          final original = File(task.savePath);
+          final temp = File(tempPath);
+          await original.delete();
+          await temp.rename(task.savePath);
+        }
+      }
+    } catch (e) {
+      debugPrint('Metadata error: $e');
+    }
   }
 }
 

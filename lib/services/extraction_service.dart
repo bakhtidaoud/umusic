@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
 import 'package:youtube_explode_dart/youtube_explode_dart.dart';
+import 'network_service.dart';
 import '../services/native_service.dart';
 
 class YtDlpFormat {
@@ -14,6 +15,9 @@ class YtDlpFormat {
   final bool isHdr;
   final bool is360;
   final bool is3d;
+  final String? url;
+  final int? bitrate;
+  final String? type; // 'muxed', 'video', 'audio'
 
   YtDlpFormat({
     required this.formatId,
@@ -25,6 +29,9 @@ class YtDlpFormat {
     this.isHdr = false,
     this.is360 = false,
     this.is3d = false,
+    this.url,
+    this.bitrate,
+    this.type,
   });
 
   factory YtDlpFormat.fromJson(Map<String, dynamic> json) {
@@ -47,6 +54,15 @@ class YtDlpFormat {
           note.toString().contains('360') ||
           json['vcodec'].toString().contains('vp9.2'),
       is3d: note.toString().contains('3D') || note.toString().contains('LR'),
+      url: json['url'],
+      bitrate: json['tbr'] != null
+          ? (json['tbr'] * 1000).toInt()
+          : json['abr'] != null
+          ? (json['abr'] * 1000).toInt()
+          : null,
+      type: (json['vcodec'] != 'none' && json['acodec'] != 'none')
+          ? 'muxed'
+          : (json['vcodec'] != 'none' ? 'video' : 'audio'),
     );
   }
 }
@@ -75,6 +91,8 @@ class UniversalMetadata {
   final bool isPlaylist;
   final List<PlaylistEntry> entries;
   final String? videoId;
+  final String? artist;
+  final String? album;
 
   UniversalMetadata({
     required this.title,
@@ -86,6 +104,8 @@ class UniversalMetadata {
     this.isPlaylist = false,
     this.entries = const [],
     this.videoId,
+    this.artist,
+    this.album,
   });
 }
 
@@ -114,6 +134,15 @@ class ExtractionService extends GetxController {
     if (_cache.containsKey(url)) {
       debugPrint('Returning cached metadata for $url');
       return _cache[url];
+    }
+
+    if (!Get.find<NetworkService>().isConnected.value) {
+      Get.snackbar(
+        'Offline',
+        'Cannot fetch metadata while offline.',
+        snackPosition: SnackPosition.BOTTOM,
+      );
+      return null;
     }
 
     if (url.contains('youtube.com/playlist') || url.contains('list=')) {
@@ -172,6 +201,41 @@ class ExtractionService extends GetxController {
             codec: s.videoCodec,
             filesizeMb: s.size.totalMegaBytes,
             note: 'Muxed (V+A)',
+            url: s.url.toString(),
+            bitrate: s.bitrate.bitsPerSecond,
+            type: 'muxed',
+          ),
+        );
+      }
+
+      for (var s in manifest.videoOnly) {
+        formats.add(
+          YtDlpFormat(
+            formatId: s.tag.toString(),
+            ext: s.container.name,
+            resolution: s.videoQuality.toString().split('.').last,
+            codec: s.videoCodec,
+            filesizeMb: s.size.totalMegaBytes,
+            note: 'Video Only',
+            url: s.url.toString(),
+            bitrate: s.bitrate.bitsPerSecond,
+            type: 'video',
+          ),
+        );
+      }
+
+      for (var s in manifest.audioOnly) {
+        formats.add(
+          YtDlpFormat(
+            formatId: s.tag.toString(),
+            ext: s.container.name,
+            resolution: 'audio',
+            codec: s.audioCodec,
+            filesizeMb: s.size.totalMegaBytes,
+            note: 'Audio Only',
+            url: s.url.toString(),
+            bitrate: s.bitrate.bitsPerSecond,
+            type: 'audio',
           ),
         );
       }
@@ -184,6 +248,8 @@ class ExtractionService extends GetxController {
         originalUrl: url,
         isYoutube: true,
         videoId: video.id.value,
+        artist: video.author,
+        album: 'YouTube',
       );
 
       _cache[url] = metadata;
@@ -257,6 +323,8 @@ UniversalMetadata? _parseYtDlpOutput(Map<String, dynamic> params) {
         isYoutube: false,
         isPlaylist: true,
         entries: entries,
+        artist: firstData['uploader'] ?? firstData['artist'],
+        album: firstData['album'],
       );
     } else {
       final data = jsonDecode(lines.first);
@@ -271,6 +339,8 @@ UniversalMetadata? _parseYtDlpOutput(Map<String, dynamic> params) {
         originalUrl: url,
         isYoutube: false,
         videoId: data['id'],
+        artist: data['uploader'] ?? data['artist'],
+        album: data['album'],
       );
     }
   } catch (e) {

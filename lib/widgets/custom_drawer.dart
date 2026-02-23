@@ -16,7 +16,6 @@ class CustomDrawer extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    bool isDark = Theme.of(context).brightness == Brightness.dark;
     return Drawer(
       backgroundColor: Colors.transparent, // Fully transparent for glass effect
       elevation: 0,
@@ -115,7 +114,7 @@ class CustomDrawer extends StatelessWidget {
                 height: 48,
               ),
             ),
-          ).animate().shimmer(duration: 2.seconds),
+          ).animate().shimmer(duration: const Duration(seconds: 2)),
           const SizedBox(width: 20),
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,

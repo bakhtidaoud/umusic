@@ -1,5 +1,6 @@
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:system_tray/system_tray.dart';
@@ -7,11 +8,14 @@ import 'package:just_audio_background/just_audio_background.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'dart:io';
 
+import 'services/cache_service.dart';
+import 'services/network_service.dart';
 import 'services/native_service.dart';
 import 'services/extraction_service.dart';
 import 'controllers/config_controller.dart';
 import 'controllers/download_controller.dart';
 import 'controllers/subscription_controller.dart';
+import 'services/geo_service.dart';
 import 'controllers/cookie_controller.dart';
 import 'controllers/library_controller.dart';
 import 'controllers/player_controller.dart';
@@ -42,13 +46,18 @@ void main() async {
     await initSystemTray();
   }
 
-  // Initialize GetX Controllers
+  // Initialize GetX Controllers & Services
   Get.put(ConfigController(prefs));
+  await Get.putAsync(() => CacheService().init());
+  await Get.putAsync(() => NetworkService().init());
+
+  Get.put(NativeService());
   Get.put(DownloadController());
   Get.put(ExtractionService());
   Get.put(SubscriptionController(prefs));
   Get.put(CookieController());
   Get.put(LibraryController());
+  Get.put(GeoService());
   Get.put(PlayerController()); // Global Player Controller
 
   runApp(const MyApp());
@@ -129,6 +138,40 @@ class _MyHomePageState extends State<MyHomePage> {
     super.initState();
     _checkPermissions();
     _initServices();
+    _checkClipboardForLinks();
+  }
+
+  Future<void> _checkClipboardForLinks() async {
+    // Wait a bit for the app to settle
+    await Future.delayed(const Duration(seconds: 1));
+    final data = await Clipboard.getData('text/plain');
+    final text = data?.text;
+    if (text != null &&
+        (text.contains('youtube.com') || text.contains('youtu.be'))) {
+      Get.snackbar(
+        'Link Detected',
+        'Found a video link in your clipboard. Download?',
+        mainButton: TextButton(
+          onPressed: () {
+            _pageController.jumpToPage(1); // Go to Downloader
+            Get.back();
+          },
+          child: const Text(
+            'OPEN',
+            style: TextStyle(
+              color: UDesign.primary,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ),
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: Colors.black87,
+        colorText: Colors.white,
+        duration: const Duration(seconds: 5),
+        margin: const EdgeInsets.all(16),
+        borderRadius: 16,
+      );
+    }
   }
 
   Future<void> _checkPermissions() async {

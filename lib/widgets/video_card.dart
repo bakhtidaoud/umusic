@@ -6,6 +6,7 @@ import 'package:get/get.dart';
 import 'package:youtube_explode_dart/youtube_explode_dart.dart';
 import '../utils/design_system.dart';
 import '../screens/video_player_screen.dart';
+import 'download_quality_sheet.dart';
 
 class VideoCard extends StatefulWidget {
   final Video video;
@@ -44,7 +45,7 @@ class _VideoCardState extends State<VideoCard> {
         onTap: () =>
             Get.to(() => VideoPlayerScreen(videoUrl: widget.video.url)),
         child: AnimatedContainer(
-          duration: 300.ms,
+          duration: const Duration(milliseconds: 300),
           curve: Curves.easeOutCubic,
           transform: _isHovered
               ? (Matrix4.identity()
@@ -95,7 +96,7 @@ class _VideoCardState extends State<VideoCard> {
         onTap: () =>
             Get.to(() => VideoPlayerScreen(videoUrl: widget.video.url)),
         child: AnimatedContainer(
-          duration: 300.ms,
+          duration: const Duration(milliseconds: 300),
           curve: Curves.easeOutCubic,
           width: 180,
           transform: _isHovered
@@ -235,7 +236,7 @@ class _VideoCardState extends State<VideoCard> {
                   size: 50,
                 ),
               ),
-            ).animate().fadeIn(duration: 200.ms),
+            ).animate().fadeIn(duration: const Duration(milliseconds: 200)),
           ),
       ],
     );
@@ -297,8 +298,25 @@ class _VideoCardState extends State<VideoCard> {
               ],
             ),
           ),
+          IconButton(
+            onPressed: () => _showDownloadSheet(context),
+            icon: Icon(
+              Icons.download_for_offline_outlined,
+              size: 20,
+              color: isDark ? Colors.white38 : Colors.black38,
+            ),
+            tooltip: 'Download',
+          ),
         ],
       ),
+    );
+  }
+
+  void _showDownloadSheet(BuildContext context) {
+    Get.bottomSheet(
+      DownloadQualitySheet(url: widget.video.url, title: widget.video.title),
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
     );
   }
 }

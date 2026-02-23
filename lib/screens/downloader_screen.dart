@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_animate/flutter_animate.dart';
@@ -172,9 +173,26 @@ class _DownloaderScreenState extends State<DownloaderScreen> {
               ),
             ),
             IconButton.filled(
+              onPressed: () async {
+                final data = await Clipboard.getData('text/plain');
+                if (data?.text != null) {
+                  _urlController.text = data!.text!;
+                  _fetchMetadata();
+                }
+              },
+              style: IconButton.styleFrom(
+                backgroundColor: isDark ? Colors.white10 : Colors.black12,
+                foregroundColor: UDesign.primary,
+              ),
+              icon: const Icon(Icons.content_paste_rounded),
+              tooltip: 'Paste',
+            ),
+            const SizedBox(width: 8),
+            IconButton.filled(
               onPressed: _fetchMetadata,
               style: IconButton.styleFrom(backgroundColor: UDesign.primary),
               icon: const Icon(Icons.analytics_rounded),
+              tooltip: 'Analyze',
             ),
           ],
         ),

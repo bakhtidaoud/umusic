@@ -7,6 +7,8 @@ import '../controllers/home_controller.dart';
 import '../controllers/cookie_controller.dart';
 import '../utils/design_system.dart';
 import '../widgets/video_card.dart';
+import '../services/network_service.dart';
+import 'browser_screen.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
@@ -32,11 +34,18 @@ class HomeScreen extends StatelessWidget {
                   if (controller.videos.isEmpty && controller.shorts.isEmpty) {
                     return _buildEmptyState(context, controller);
                   }
-                  return const SizedBox.shrink();
+                  return Column(
+                    children: [
+                      if (!controller.isLoggedIn.value &&
+                          controller.currentQuery.value == 'trending music')
+                        _buildLoginPrompt(context),
+                      const SizedBox.shrink(),
+                    ],
+                  );
                 }),
               ),
               Obx(() => _buildVideoGrid(context, controller)),
-              SliverToBoxAdapter(child: const SizedBox(height: 100)),
+              const SliverToBoxAdapter(child: SizedBox(height: 100)),
             ],
           ),
           // Suggestions Overlay
@@ -47,9 +56,44 @@ class HomeScreen extends StatelessWidget {
             }
             return _buildSuggestionsOverlay(controller);
           }),
+          // Offline Banner
+          _buildOfflineBanner(),
         ],
       ),
     );
+  }
+
+  Widget _buildOfflineBanner() {
+    final networkService = Get.find<NetworkService>();
+    return Obx(() {
+      if (networkService.isConnected.value) return const SizedBox.shrink();
+      return Positioned(
+        top: 0,
+        left: 0,
+        right: 0,
+        child: Container(
+          padding: const EdgeInsets.only(top: 50, bottom: 8),
+          color: Colors.redAccent.withOpacity(0.9),
+          child: const Center(
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.wifi_off_rounded, color: Colors.white, size: 16),
+                SizedBox(width: 8),
+                Text(
+                  'Offline Mode - Some content may not be available',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ).animate().slideY(begin: -1, end: 0),
+      );
+    });
   }
 
   Widget _buildSliverAppBar(
@@ -89,7 +133,10 @@ class HomeScreen extends StatelessWidget {
                     color: UDesign.primary.withOpacity(0.05),
                   ),
                 ),
-              ).animate().scale(duration: 2.seconds, curve: Curves.easeInOut),
+              ).animate().scale(
+                duration: const Duration(seconds: 2),
+                curve: Curves.easeInOut,
+              ),
               Padding(
                 padding: const EdgeInsets.fromLTRB(20, 60, 20, 20),
                 child: Column(
@@ -192,7 +239,7 @@ class HomeScreen extends StatelessWidget {
                   onTap: () => controller.setCategory(category),
                   borderRadius: BorderRadius.circular(20),
                   child: AnimatedContainer(
-                    duration: 250.ms,
+                    duration: const Duration(milliseconds: 250),
                     padding: const EdgeInsets.symmetric(horizontal: 18),
                     alignment: Alignment.center,
                     decoration: BoxDecoration(
@@ -258,7 +305,7 @@ class HomeScreen extends StatelessWidget {
               padding: const EdgeInsets.only(bottom: 24),
               child: AnimationConfiguration.staggeredList(
                 position: index,
-                duration: 600.ms,
+                duration: const Duration(milliseconds: 600),
                 child: SlideAnimation(
                   verticalOffset: 50,
                   child: FadeInAnimation(child: VideoCard(video: video)),
@@ -316,7 +363,7 @@ class HomeScreen extends StatelessWidget {
                 padding: const EdgeInsets.only(right: 16),
                 child: AnimationConfiguration.staggeredList(
                   position: index,
-                  duration: 500.ms,
+                  duration: const Duration(milliseconds: 500),
                   child: ScaleAnimation(
                     child: FadeInAnimation(
                       child: VideoCard(
@@ -452,6 +499,94 @@ class HomeScreen extends StatelessWidget {
           ),
         )
         .animate(onPlay: (controller) => controller.repeat())
-        .shimmer(duration: 1500.ms, color: Colors.white.withOpacity(0.05));
+        .shimmer(
+          duration: const Duration(milliseconds: 1500),
+          color: Colors.white.withOpacity(0.05),
+        );
+  }
+
+  Widget _buildLoginPrompt(BuildContext context) {
+    bool isDark = Theme.of(context).brightness == Brightness.dark;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+      child: UDesign.glassLayer(
+        borderRadius: BorderRadius.circular(24),
+        child: Container(
+          padding: const EdgeInsets.all(20),
+          decoration: UDesign.glass(context: context, opacity: 0.05),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: UDesign.primary.withOpacity(0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.person_outline_rounded,
+                  color: UDesign.primary,
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Personalize Your Experience',
+                      style: GoogleFonts.outfit(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                        color: isDark
+                            ? UDesign.textHighDark
+                            : UDesign.textHighLight,
+                      ),
+                    ),
+                    Text(
+                      'Login to see your subscriptions and recommendations.',
+                      style: GoogleFonts.outfit(
+                        fontSize: 13,
+                        color: isDark
+                            ? UDesign.textMedDark
+                            : UDesign.textMedLight,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              ElevatedButton(
+                onPressed: () => Get.to(
+                  () => Scaffold(
+                    appBar: AppBar(
+                      title: Text(
+                        'YouTube Login',
+                        style: GoogleFonts.outfit(fontWeight: FontWeight.bold),
+                      ),
+                      backgroundColor: Colors.transparent,
+                      elevation: 0,
+                    ),
+                    body: const BrowserScreen(
+                      initialUrl:
+                          'https://accounts.google.com/ServiceLogin?service=youtube',
+                    ),
+                  ),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: UDesign.primary,
+                  foregroundColor: Colors.black,
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                ),
+                child: const Text('Login'),
+              ),
+            ],
+          ),
+        ),
+      ),
+    ).animate().fadeIn().slideY(begin: 0.2);
   }
 }

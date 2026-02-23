@@ -3,8 +3,11 @@ import 'package:youtube_explode_dart/youtube_explode_dart.dart';
 import 'package:flutter/material.dart';
 import 'package:dio/dio.dart' as dio;
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'cookie_controller.dart';
+import '../services/geo_service.dart';
 import '../services/extraction_service.dart';
+import '../services/cache_service.dart';
 
 class HomeController extends GetxController {
   late YoutubeExplode _yt;
@@ -13,6 +16,7 @@ class HomeController extends GetxController {
   var videos = <Video>[].obs;
   var shorts = <Video>[].obs;
   var isLoading = true.obs;
+  var isLoggedIn = false.obs;
   var currentQuery = 'trending music'.obs;
   var currentCategory = 'All'.obs;
 
@@ -38,9 +42,18 @@ class HomeController extends GetxController {
   void onInit() {
     super.onInit();
     _yt = YoutubeExplode();
+    checkLoginStatus();
     fetchVideos();
 
     searchController.addListener(_onSearchChanged);
+  }
+
+  Future<void> checkLoginStatus() async {
+    final cookieController = Get.find<CookieController>();
+    final cookies = await cookieController.getCookieString(
+      Uri.parse('https://www.youtube.com'),
+    );
+    isLoggedIn.value = cookies != null && cookies.isNotEmpty;
   }
 
   void _onSearchChanged() {
@@ -77,18 +90,14 @@ class HomeController extends GetxController {
     showSuggestions.value = false;
 
     try {
-      // Get cookies and update YouTube client for personalized results
+      await checkLoginStatus();
+
       final cookieController = Get.find<CookieController>();
       final cookies = await cookieController.getCookieString(
         Uri.parse('https://www.youtube.com'),
       );
 
       if (cookies != null) {
-        _yt.close();
-        _yt = YoutubeExplode(); // Re-init with cookies if needed by lib,
-        // though youtube_explode_dart doesn't have a direct cookie constructor,
-        // we can set headers if we were using a custom client.
-        // For now, we'll ensure extraction service is also updated.
         if (Get.isRegistered<ExtractionService>()) {
           Get.find<ExtractionService>().setCookies(cookies);
         }
@@ -97,32 +106,82 @@ class HomeController extends GetxController {
       if (query != null) currentQuery.value = query;
       if (category != null) currentCategory.value = category;
 
+      List<Video> results = [];
       String finalQuery = currentQuery.value;
-      if (currentCategory.value != 'All') {
-        finalQuery = '${currentCategory.value} $finalQuery';
+      final geoService = Get.find<GeoService>();
+      final country = geoService.countryCode.value;
+
+      // Logic for personalized or trending feed
+      if (finalQuery == 'trending music' && currentCategory.value == 'All') {
+        if (isLoggedIn.value) {
+          // If logged in, we search for generic "music" which often returns personalized results with cookies
+          // or we could try to get their subscription feed if the library supported it.
+          // For now, we search for broad terms that benefit from personalization.
+          final searchResult = await _yt.search.getVideos(
+            'music recommendations',
+            filter: TypeFilters.video,
+          );
+          results = searchResult.toList();
+        } else {
+          // If NOT logged in, get country-specific trending
+          // We'll use search for trending topics which is more reliable across library versions
+          final searchResult = await _yt.search.getVideos(
+            'trending music $country',
+          );
+          results = searchResult.toList();
+        }
+      } else {
+        // Normal search or category filter
+        String searchQuery = finalQuery;
+        if (currentCategory.value != 'All') {
+          searchQuery = '${currentCategory.value} $finalQuery';
+        }
+        final searchResult = await _yt.search.getVideos(searchQuery);
+        results = searchResult.toList();
       }
 
-      final result = await _yt.search.getVideos(finalQuery);
+      // Filter Shorts and Regular videos in an isolate for performance
+      final categorization = await compute(_categorizeVideos, results);
+      var filteredRegular = categorization['regular']!;
+      var filteredShorts = categorization['shorts']!;
 
-      // Filter Shorts (roughly videos < 70 seconds or with "shorts" in metadata)
-      final allVids = result.toList();
-      final List<Video> filteredShorts = [];
-      final List<Video> filteredRegular = [];
+      // If we didn't get enough shorts from the results, specifically fetch some
+      if (filteredShorts.length < 5 &&
+          (query == null || query == 'trending music')) {
+        final shortResults = await _yt.search.getVideos(
+          isLoggedIn.value
+              ? 'shorts recommendations'
+              : 'trending shorts $country',
+        );
+        final moreCategorization = await compute(
+          _categorizeVideos,
+          shortResults.toList(),
+        );
+        final moreShorts = moreCategorization['shorts']!;
 
-      for (var v in allVids) {
-        if (v.duration != null && v.duration!.inSeconds < 70) {
-          filteredShorts.add(v);
-        } else {
-          filteredRegular.add(v);
+        for (var v in moreShorts) {
+          if (!filteredShorts.any((existing) => existing.id == v.id)) {
+            filteredShorts.add(v);
+          }
         }
       }
 
-      videos.assignAll(filteredRegular.take(20));
+      videos.assignAll(filteredRegular.take(30));
       shorts.assignAll(filteredShorts.take(15));
+
+      // Persistently cache trending results
+      if (finalQuery == 'trending music' && currentCategory.value == 'All') {
+        final cacheService = Get.find<CacheService>();
+        await cacheService.cacheSearchResults(
+          'trending_$country',
+          videos.map((v) => v.id.value).toList(),
+        );
+      }
     } catch (e) {
+      debugPrint('Error fetching videos: $e');
       Get.snackbar(
         'Error',
-        'Failed to load videos: $e',
+        'Failed to load videos. Please try again.',
         snackPosition: SnackPosition.BOTTOM,
       );
     } finally {
@@ -147,4 +206,19 @@ class HomeController extends GetxController {
     _debounce?.cancel();
     super.onClose();
   }
+}
+
+Map<String, List<Video>> _categorizeVideos(List<Video> videos) {
+  final List<Video> shorts = [];
+  final List<Video> regular = [];
+
+  for (var v in videos) {
+    if (v.duration != null && v.duration!.inSeconds < 70) {
+      shorts.add(v);
+    } else {
+      regular.add(v);
+    }
+  }
+
+  return {'shorts': shorts, 'regular': regular};
 }

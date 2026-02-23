@@ -3,6 +3,7 @@ import 'package:get/get.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../controllers/config_controller.dart';
+import '../services/cache_service.dart';
 import '../utils/design_system.dart';
 
 class SettingsScreen extends StatelessWidget {
@@ -187,6 +188,49 @@ class SettingsScreen extends StatelessWidget {
                     configController.setThemeMode(val);
                   }
                 },
+              ),
+            ),
+            _buildSectionHeader(context, 'Storage & Cache'),
+            _buildSettingCard(
+              context,
+              child: Column(
+                children: [
+                  FutureBuilder<double>(
+                    future: Get.find<CacheService>().getCacheSize(),
+                    builder: (context, snapshot) {
+                      return _buildListTile(
+                        context,
+                        title: 'Clear Search Cache',
+                        subtitle:
+                            'Currently using ${snapshot.data?.toStringAsFixed(2) ?? "0.00"} MB',
+                        icon: Icons.cleaning_services_rounded,
+                        onTap: () async {
+                          await Get.find<CacheService>().clearCache();
+                          Get.snackbar(
+                            'Cache Cleared',
+                            'Search and metadata cache has been emptied.',
+                            snackPosition: SnackPosition.BOTTOM,
+                          );
+                          (context as Element).markNeedsBuild();
+                        },
+                      );
+                    },
+                  ),
+                  const Divider(indent: 16, endIndent: 16, height: 1),
+                  _buildListTile(
+                    context,
+                    title: 'Force Binary Update',
+                    subtitle: 'Re-extract yt-dlp and ffmpeg',
+                    icon: Icons.refresh_rounded,
+                    onTap: () {
+                      Get.snackbar(
+                        'Coming Soon',
+                        'Feature in development.',
+                        snackPosition: SnackPosition.BOTTOM,
+                      );
+                    },
+                  ),
+                ],
               ),
             ),
             _buildSectionHeader(context, 'Experimental'),

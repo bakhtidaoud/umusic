@@ -14,7 +14,6 @@ class LocalLibraryScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    bool isDark = Theme.of(context).brightness == Brightness.dark;
     final controller = Get.put(LibraryController());
     final TextEditingController searchTeco = TextEditingController();
     return Scaffold(

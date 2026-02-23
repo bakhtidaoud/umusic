@@ -101,13 +101,19 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
           children: [
             AspectRatio(
               aspectRatio: 16 / 9,
-              child: PodVideoPlayer(
-                controller: controller.podController!,
-                podProgressBarConfig: const PodProgressBarConfig(
-                  padding: EdgeInsets.zero,
-                  playingBarColor: UDesign.primary,
-                  circleHandlerColor: UDesign.primary,
-                ),
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  PodVideoPlayer(
+                    controller: controller.podController!,
+                    podProgressBarConfig: const PodProgressBarConfig(
+                      padding: EdgeInsets.zero,
+                      playingBarColor: UDesign.primary,
+                      circleHandlerColor: UDesign.primary,
+                    ),
+                  ),
+                  _buildGestureOverlay(),
+                ],
               ),
             ),
             Expanded(
@@ -279,6 +285,63 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
           ],
         );
       }),
+    );
+  }
+
+  Widget _buildGestureOverlay() {
+    return Row(
+      children: [
+        Expanded(
+          child: GestureDetector(
+            onDoubleTap: () => _seekRelative(const Duration(seconds: -10)),
+            child: Container(color: Colors.transparent),
+          ),
+        ),
+        Expanded(
+          child: GestureDetector(
+            onDoubleTap: () => _seekRelative(const Duration(seconds: 10)),
+            child: Container(color: Colors.transparent),
+          ),
+        ),
+      ],
+    );
+  }
+
+  void _seekRelative(Duration duration) async {
+    if (controller.podController == null) return;
+    final vControl =
+        (controller.podController as dynamic).videoPlayerController;
+    if (vControl == null) return;
+
+    final currentPos = vControl.value.position;
+    final newPos = currentPos + duration;
+    await (controller.podController as dynamic).videoPlayerController?.seekTo(
+      newPos,
+    );
+
+    _showSeekFeedback(duration.inSeconds > 0);
+  }
+
+  void _showSeekFeedback(bool isForward) {
+    Get.rawSnackbar(
+      messageText: Center(
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.black45,
+            shape: BoxShape.circle,
+          ),
+          child: Icon(
+            isForward ? Icons.fast_forward_rounded : Icons.fast_rewind_rounded,
+            color: Colors.white,
+            size: 40,
+          ),
+        ),
+      ),
+      backgroundColor: Colors.transparent,
+      duration: const Duration(milliseconds: 500),
+      snackPosition: SnackPosition.TOP,
+      overlayBlur: 0,
     );
   }
 

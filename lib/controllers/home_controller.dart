@@ -3,9 +3,11 @@ import 'package:youtube_explode_dart/youtube_explode_dart.dart';
 import 'package:flutter/material.dart';
 import 'package:dio/dio.dart' as dio;
 import 'dart:async';
+import 'cookie_controller.dart';
+import '../services/extraction_service.dart';
 
 class HomeController extends GetxController {
-  final YoutubeExplode _yt = YoutubeExplode();
+  late YoutubeExplode _yt;
   final dio.Dio _dio = dio.Dio();
 
   var videos = <Video>[].obs;
@@ -16,6 +18,7 @@ class HomeController extends GetxController {
 
   var suggestions = <String>[].obs;
   var showSuggestions = false.obs;
+  var searchText = ''.obs;
 
   final TextEditingController searchController = TextEditingController();
   Timer? _debounce;
@@ -34,12 +37,14 @@ class HomeController extends GetxController {
   @override
   void onInit() {
     super.onInit();
+    _yt = YoutubeExplode();
     fetchVideos();
 
     searchController.addListener(_onSearchChanged);
   }
 
   void _onSearchChanged() {
+    searchText.value = searchController.text;
     if (_debounce?.isActive ?? false) _debounce!.cancel();
     _debounce = Timer(const Duration(milliseconds: 500), () {
       fetchSuggestions(searchController.text);
@@ -72,6 +77,23 @@ class HomeController extends GetxController {
     showSuggestions.value = false;
 
     try {
+      // Get cookies and update YouTube client for personalized results
+      final cookieController = Get.find<CookieController>();
+      final cookies = await cookieController.getCookieString(
+        Uri.parse('https://www.youtube.com'),
+      );
+
+      if (cookies != null) {
+        _yt.close();
+        _yt = YoutubeExplode(); // Re-init with cookies if needed by lib,
+        // though youtube_explode_dart doesn't have a direct cookie constructor,
+        // we can set headers if we were using a custom client.
+        // For now, we'll ensure extraction service is also updated.
+        if (Get.isRegistered<ExtractionService>()) {
+          Get.find<ExtractionService>().setCookies(cookies);
+        }
+      }
+
       if (query != null) currentQuery.value = query;
       if (category != null) currentCategory.value = category;
 

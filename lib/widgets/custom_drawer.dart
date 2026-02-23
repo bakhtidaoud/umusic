@@ -16,19 +16,18 @@ class CustomDrawer extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    bool isDark = Theme.of(context).brightness == Brightness.dark;
     return Drawer(
       backgroundColor: Colors.transparent, // Fully transparent for glass effect
       elevation: 0,
       width: MediaQuery.of(context).size.width * 0.75,
-      child: UDesign.glassMaterial(
+      child: UDesign.glassLayer(
         borderRadius: const BorderRadius.horizontal(right: Radius.circular(32)),
         child: Container(
-          decoration: BoxDecoration(
-            color: UDesign.background.withOpacity(0.85),
+          decoration: UDesign.glass(context: context).copyWith(
             borderRadius: const BorderRadius.horizontal(
               right: Radius.circular(32),
             ),
-            border: Border.all(color: Colors.white.withOpacity(0.05)),
           ),
           child: Column(
             children: [
@@ -87,6 +86,7 @@ class CustomDrawer extends StatelessWidget {
   }
 
   Widget _buildHeader(BuildContext context) {
+    bool isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       padding: const EdgeInsets.only(top: 80, left: 24, right: 24, bottom: 40),
       decoration: BoxDecoration(
@@ -103,9 +103,11 @@ class CustomDrawer extends StatelessWidget {
             child: Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.05),
-                borderRadius: UDesign.brSmall,
-                border: Border.all(color: Colors.white12),
+                color: isDark ? Colors.white12 : Colors.black12,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                  color: isDark ? Colors.white12 : Colors.black12,
+                ),
               ),
               child: SvgPicture.asset(
                 'assets/app_icon.svg',
@@ -124,7 +126,7 @@ class CustomDrawer extends StatelessWidget {
                   fontSize: 28,
                   fontWeight: FontWeight.bold,
                   letterSpacing: -0.5,
-                  color: Colors.white,
+                  color: isDark ? UDesign.textHighDark : UDesign.textHighLight,
                 ),
               ),
               Text(
@@ -149,6 +151,7 @@ class CustomDrawer extends StatelessWidget {
     required String label,
   }) {
     final isSelected = selectedIndex == index;
+    bool isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
@@ -157,14 +160,14 @@ class CustomDrawer extends StatelessWidget {
           Navigator.pop(context);
           onDestinationSelected(index);
         },
-        borderRadius: UDesign.brMedium,
+        borderRadius: BorderRadius.circular(24),
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
           decoration: BoxDecoration(
             color: isSelected
                 ? UDesign.primary.withOpacity(0.1)
                 : Colors.transparent,
-            borderRadius: UDesign.brMedium,
+            borderRadius: BorderRadius.circular(24),
             border: isSelected
                 ? Border.all(color: UDesign.primary.withOpacity(0.3), width: 1)
                 : null,
@@ -173,7 +176,9 @@ class CustomDrawer extends StatelessWidget {
             children: [
               Icon(
                 icon,
-                color: isSelected ? UDesign.primary : Colors.white60,
+                color: isSelected
+                    ? UDesign.primary
+                    : (isDark ? UDesign.textMedDark : UDesign.textMedLight),
                 size: 24,
               ),
               const SizedBox(width: 16),
@@ -182,7 +187,9 @@ class CustomDrawer extends StatelessWidget {
                 style: GoogleFonts.outfit(
                   fontSize: 17,
                   fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
-                  color: isSelected ? Colors.white : Colors.white70,
+                  color: isSelected
+                      ? UDesign.primary
+                      : (isDark ? UDesign.textHighDark : UDesign.textHighLight),
                 ),
               ),
               if (isSelected) const Spacer(),

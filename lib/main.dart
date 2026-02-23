@@ -1,4 +1,3 @@
-import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
@@ -16,14 +15,12 @@ import 'controllers/subscription_controller.dart';
 import 'controllers/cookie_controller.dart';
 import 'controllers/library_controller.dart';
 import 'controllers/player_controller.dart';
-import 'screens/login_webview_screen.dart';
 import 'screens/settings_screen.dart';
 import 'screens/browser_screen.dart';
 import 'screens/subscriptions_screen.dart';
 import 'screens/home_screen.dart';
 import 'screens/downloader_screen.dart';
 import 'screens/local_library_screen.dart';
-import 'widgets/custom_drawer.dart';
 import 'widgets/mini_player.dart';
 import 'utils/design_system.dart';
 
@@ -92,15 +89,10 @@ class MyApp extends StatelessWidget {
         title: 'uMusic',
         debugShowCheckedModeBanner: false,
         themeMode: themeMode,
-        theme: ThemeData(
-          useMaterial3: true,
-          colorScheme: ColorScheme.fromSeed(
-            seedColor: UDesign.primary,
-            brightness: Brightness.light,
-          ),
+        theme: UDesign.premiumLight.copyWith(
           textTheme: GoogleFonts.outfitTextTheme(),
         ),
-        darkTheme: UDesign.darkTheme.copyWith(
+        darkTheme: UDesign.premiumDark.copyWith(
           textTheme: GoogleFonts.outfitTextTheme(ThemeData.dark().textTheme),
         ),
         home: const MyHomePage(title: 'uMusic'),
@@ -129,18 +121,8 @@ class MyHomePage extends StatefulWidget {
 }
 
 class _MyHomePageState extends State<MyHomePage> {
-  int _selectedIndex = 0;
-  String? _prefetchedUrl;
   final PageController _pageController = PageController();
-
-  final List<String> _titles = [
-    'uMusic Home',
-    'Downloader',
-    'Local Library',
-    'Subscriptions',
-    'Browser',
-    'Settings',
-  ];
+  final String? _prefetchedUrl = null;
 
   @override
   void initState() {
@@ -195,54 +177,6 @@ class _MyHomePageState extends State<MyHomePage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: UDesign.background,
-      appBar: AppBar(
-        title: Text(
-          _titles[_selectedIndex],
-          style: GoogleFonts.outfit(
-            fontWeight: FontWeight.bold,
-            letterSpacing: -0.5,
-          ),
-        ),
-        centerTitle: true,
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        surfaceTintColor: Colors.transparent,
-        leading: Builder(
-          builder: (context) => IconButton(
-            icon: const Icon(Icons.menu_rounded, size: 28),
-            onPressed: () => Scaffold.of(context).openDrawer(),
-          ),
-        ),
-        actions: [
-          if (_selectedIndex == 0)
-            Padding(
-              padding: const EdgeInsets.only(right: 8.0),
-              child: IconButton(
-                icon: const Icon(Icons.account_circle_outlined, size: 28),
-                onPressed: () {
-                  Get.to(
-                    () => const LoginWebViewScreen(
-                      initialUrl:
-                          'https://accounts.google.com/ServiceLogin?service=youtube',
-                    ),
-                  );
-                },
-              ),
-            ),
-        ],
-      ),
-      drawer: CustomDrawer(
-        selectedIndex: _selectedIndex,
-        onDestinationSelected: (index) {
-          setState(() => _selectedIndex = index);
-          _pageController.animateToPage(
-            index,
-            duration: const Duration(milliseconds: 400),
-            curve: Curves.easeInOutExpo,
-          );
-        },
-      ),
       body: Stack(
         children: [
           PageView(

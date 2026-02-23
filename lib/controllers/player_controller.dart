@@ -20,6 +20,7 @@ class PlayerController extends GetxController {
 
   var isBackgroundMode = false.obs;
   var showMiniPlayer = false.obs;
+  var errorMessage = ''.obs;
 
   @override
   void onInit() {
@@ -35,13 +36,19 @@ class PlayerController extends GetxController {
   Future<void> initPlayer(String videoUrl) async {
     // If playing the same video and miniplayer is shown, don't re-init
     if (currentVideoUrl.value == videoUrl && podController != null) {
-      showMiniPlayer.value = false;
+      Future.microtask(() => showMiniPlayer.value = false);
       return;
     }
 
-    isLoading.value = true;
-    showMiniPlayer.value = false;
-    currentVideoUrl.value = videoUrl;
+    // Use microtask to avoid "setState() or markNeedsBuild() called during build"
+    // which happens if this is called during a widget's build phase (like initState)
+    // and updates a value watched by an Obx already in the tree.
+    Future.microtask(() {
+      isLoading.value = true;
+      showMiniPlayer.value = false;
+      currentVideoUrl.value = videoUrl;
+      errorMessage.value = '';
+    });
 
     try {
       final video = await _yt.videos.get(videoUrl);
@@ -98,6 +105,7 @@ class PlayerController extends GetxController {
 
       isLoading.value = false;
     } catch (e) {
+      errorMessage.value = e.toString();
       Get.snackbar('Error', 'Failed to initialize player: $e');
       isLoading.value = false;
     }

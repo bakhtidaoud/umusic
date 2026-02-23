@@ -20,6 +20,7 @@ class MiniPlayer extends StatelessWidget {
         return const SizedBox.shrink();
       }
 
+      bool isDark = Theme.of(context).brightness == Brightness.dark;
       return GestureDetector(
         onTap: () => Get.to(
           () => VideoPlayerScreen(videoUrl: controller.currentVideoUrl.value),
@@ -27,11 +28,10 @@ class MiniPlayer extends StatelessWidget {
         child: Container(
           margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           height: 70,
-          decoration: UDesign.glassDecoration(
-            borderRadius: BorderRadius.circular(20),
-            color: UDesign.surface.withOpacity(0.9),
-          ).copyWith(boxShadow: UDesign.premiumShadows()),
-          child: UDesign.glassMaterial(
+          decoration: UDesign.glass(
+            context: context,
+          ).copyWith(boxShadow: UDesign.softShadow(context)),
+          child: UDesign.glassLayer(
             borderRadius: BorderRadius.circular(20),
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 8.0),
@@ -61,7 +61,9 @@ class MiniPlayer extends StatelessWidget {
                           style: GoogleFonts.outfit(
                             fontSize: 14,
                             fontWeight: FontWeight.bold,
-                            color: Colors.white,
+                            color: isDark
+                                ? UDesign.textHighDark
+                                : UDesign.textHighLight,
                           ),
                         ),
                         Text(
@@ -69,7 +71,9 @@ class MiniPlayer extends StatelessWidget {
                           maxLines: 1,
                           style: GoogleFonts.outfit(
                             fontSize: 11,
-                            color: Colors.white60,
+                            color: isDark
+                                ? UDesign.textMedDark
+                                : UDesign.textMedLight,
                           ),
                         ),
                       ],
@@ -86,9 +90,11 @@ class MiniPlayer extends StatelessWidget {
                     onPressed: () => controller.togglePlayPause(),
                   ),
                   IconButton(
-                    icon: const Icon(
+                    icon: Icon(
                       Icons.close_rounded,
-                      color: Colors.white38,
+                      color: isDark
+                          ? UDesign.textMedDark
+                          : UDesign.textMedLight,
                     ),
                     onPressed: () => controller.stopAndDismiss(),
                   ),

@@ -20,9 +20,11 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
   @override
   void initState() {
     super.initState();
-    // Using find because it should be initialized globally or at least persist
     controller = Get.find<PlayerController>();
-    controller.initPlayer(widget.videoUrl);
+    // Use post frame callback to ensure we don't trigger rebuilds during the current build phase
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      controller.initPlayer(widget.videoUrl);
+    });
   }
 
   @override
@@ -48,21 +50,52 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
         ],
       ),
       body: Obx(() {
-        if (controller.isLoading.value) {
+        if (controller.errorMessage.value.isNotEmpty) {
+          return Center(
+            child: Padding(
+              padding: const EdgeInsets.all(24.0),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(
+                    Icons.error_outline_rounded,
+                    color: Colors.redAccent,
+                    size: 48,
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Failed to load video',
+                    style: GoogleFonts.outfit(
+                      color: Colors.white,
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    controller.errorMessage.value,
+                    textAlign: TextAlign.center,
+                    style: GoogleFonts.outfit(color: Colors.white54),
+                  ),
+                  const SizedBox(height: 24),
+                  ElevatedButton(
+                    onPressed: () => controller.initPlayer(widget.videoUrl),
+                    child: const Text('Try Again'),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }
+
+        // Show loading if explicit loading OR if we don't have a controller yet
+        if (controller.isLoading.value || controller.podController == null) {
           return const Center(
             child: CircularProgressIndicator(color: UDesign.primary),
           );
         }
 
-        if (controller.podController == null) {
-          return const Center(
-            child: Text(
-              'Error loading player',
-              style: TextStyle(color: Colors.white),
-            ),
-          );
-        }
-
+        bool isDark = Theme.of(context).brightness == Brightness.dark;
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -81,7 +114,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
               child: Container(
                 padding: const EdgeInsets.all(24),
                 decoration: BoxDecoration(
-                  color: UDesign.background,
+                  color: Theme.of(context).scaffoldBackgroundColor,
                   borderRadius: const BorderRadius.vertical(
                     top: Radius.circular(32),
                   ),
@@ -103,7 +136,9 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                         style: GoogleFonts.outfit(
                           fontSize: 22,
                           fontWeight: FontWeight.bold,
-                          color: Colors.white,
+                          color: isDark
+                              ? UDesign.textHighDark
+                              : UDesign.textHighLight,
                           height: 1.2,
                         ),
                       ),
@@ -132,7 +167,9 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                           Text(
                             'YouTube',
                             style: GoogleFonts.outfit(
-                              color: Colors.white38,
+                              color: isDark
+                                  ? UDesign.textMedDark
+                                  : UDesign.textMedLight,
                               fontSize: 13,
                             ),
                           ),
@@ -142,8 +179,8 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceAround,
                         children: [
-                          _buildAction(Icons.thumb_up_rounded, 'Like'),
-                          _buildAction(Icons.share_rounded, 'Share'),
+                          _buildAction(context, Icons.thumb_up_rounded, 'Like'),
+                          _buildAction(context, Icons.share_rounded, 'Share'),
                           GestureDetector(
                             onTap: () {
                               final downloadController =
@@ -160,56 +197,67 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                               );
                             },
                             child: _buildAction(
+                              context,
                               Icons.download_rounded,
                               'Download',
                             ),
                           ),
-                          _buildAction(Icons.playlist_add_rounded, 'Save'),
+                          _buildAction(
+                            context,
+                            Icons.playlist_add_rounded,
+                            'Save',
+                          ),
                         ],
                       ),
-                      const Padding(
-                        padding: EdgeInsets.symmetric(vertical: 32),
-                        child: Divider(color: Colors.white10),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 32),
+                        child: Divider(
+                          color: isDark
+                              ? Colors.white10
+                              : Colors.black.withOpacity(0.1),
+                        ),
                       ),
                       // Audio-only toggle
-                      UDesign.glassMaterial(
-                        borderRadius: UDesign.brMedium,
+                      UDesign.glassLayer(
+                        borderRadius: BorderRadius.circular(24),
                         child: Container(
                           padding: const EdgeInsets.all(4),
-                          decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.03),
-                            borderRadius: UDesign.brMedium,
-                            border: Border.all(
-                              color: Colors.white.withOpacity(0.05),
-                            ),
-                          ),
+                          decoration: UDesign.glass(context: context),
                           child: ListTile(
                             leading: Container(
                               padding: const EdgeInsets.all(10),
                               decoration: BoxDecoration(
                                 color: controller.isBackgroundMode.value
                                     ? UDesign.primary.withOpacity(0.2)
-                                    : Colors.white.withOpacity(0.05),
+                                    : (isDark
+                                          ? Colors.white12
+                                          : Colors.black12),
                                 shape: BoxShape.circle,
                               ),
                               child: Icon(
                                 Icons.headset_rounded,
                                 color: controller.isBackgroundMode.value
                                     ? UDesign.primary
-                                    : Colors.white60,
+                                    : (isDark
+                                          ? UDesign.textMedDark
+                                          : UDesign.textMedLight),
                               ),
                             ),
                             title: Text(
                               'Background Audio',
                               style: GoogleFonts.outfit(
-                                color: Colors.white,
+                                color: isDark
+                                    ? UDesign.textHighDark
+                                    : UDesign.textHighLight,
                                 fontWeight: FontWeight.w600,
                               ),
                             ),
                             subtitle: Text(
                               'Play audio even when app is closed',
                               style: GoogleFonts.outfit(
-                                color: Colors.white38,
+                                color: isDark
+                                    ? UDesign.textMedDark
+                                    : UDesign.textMedLight,
                                 fontSize: 12,
                               ),
                             ),
@@ -234,22 +282,29 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
     );
   }
 
-  Widget _buildAction(IconData icon, String label) {
+  Widget _buildAction(BuildContext context, IconData icon, String label) {
+    bool isDark = Theme.of(context).brightness == Brightness.dark;
     return Column(
       children: [
         Container(
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.05),
+            color: isDark
+                ? Colors.white.withOpacity(0.05)
+                : Colors.black.withOpacity(0.05),
             shape: BoxShape.circle,
           ),
-          child: Icon(icon, color: Colors.white, size: 22),
+          child: Icon(
+            icon,
+            color: isDark ? Colors.white : Colors.black87,
+            size: 22,
+          ),
         ),
         const SizedBox(height: 8),
         Text(
           label,
           style: GoogleFonts.outfit(
-            color: Colors.white60,
+            color: isDark ? Colors.white60 : Colors.black54,
             fontSize: 12,
             fontWeight: FontWeight.w500,
           ),

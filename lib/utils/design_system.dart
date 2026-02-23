@@ -2,82 +2,84 @@ import 'package:flutter/material.dart';
 import 'dart:ui';
 
 class UDesign {
-  // --- Colors (HSL Inspired) ---
-  static const Color background = Color(0xFF0D0B14);
-  static const Color surface = Color(0xFF1A1625);
-  static const Color primary = Color(0xFFBB86FC);
-  static const Color secondary = Color(0xFF03DAC6);
-  static const Color accent = Color(0xFFFF4081);
-  static const Color textPrimary = Colors.white;
-  static const Color textSecondary = Color(0xFFB3B3B3);
+  // --- Sophisticated Color Palette ---
 
-  static const Color glassWhite = Color(0x1AFFFFFF);
-  static const Color glassBlack = Color(0x4D000000);
+  // Dark Neutrals
+  static const Color darkBg = Color(0xFF0A090F);
+  static const Color darkSurface = Color(0xFF14121F);
+  static const Color darkAccent = Color(0xFF1D1B2B);
+
+  // Light Neutrals (Premium Light Mode)
+  static const Color lightBg = Color(0xFFF8F9FA); // Soft White
+  static const Color lightSurface = Colors.white;
+  static const Color lightAccent = Color(0xFFE9ECEF);
+
+  // Brand Colors
+  static const Color primary = Color(0xFF6366F1); // Deep Indigo
+  static const Color secondary = Color(0xFFA855F7); // Vibrant Violet
+  static const Color accent = Color(0xFF22D3EE); // Pure Cyan
+
+  // Text Colors
+  static const Color textHighDark = Color(0xFFF1F5F9);
+  static const Color textMedDark = Color(0xFF94A3B8);
+  static const Color textHighLight = Color(0xFF1E293B);
+  static const Color textMedLight = Color(0xFF64748B);
 
   // --- Gradients ---
-  static const LinearGradient primaryGradient = LinearGradient(
-    colors: [Color(0xFF6200EE), Color(0xFFBB86FC)],
+  static const LinearGradient premiumGradient = LinearGradient(
+    colors: [primary, secondary],
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
   );
 
   static const LinearGradient accentGradient = LinearGradient(
-    colors: [Color(0xFFFF4081), Color(0xFFFF80AB)],
+    colors: [secondary, accent],
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
   );
 
-  static const LinearGradient glassGradient = LinearGradient(
-    colors: [glassWhite, Colors.transparent],
-    begin: Alignment.topLeft,
-    end: Alignment.bottomRight,
-  );
-
-  // --- Spacing & Radius ---
-  static const double ptLarge = 32.0;
-  static const double ptMedium = 24.0;
-  static const double ptSmall = 16.0;
-
-  static final BorderRadius brLarge = BorderRadius.circular(32.0);
-  static final BorderRadius brMedium = BorderRadius.circular(24.0);
-  static final BorderRadius brSmall = BorderRadius.circular(16.0);
-
-  // --- Decorations ---
-  static BoxDecoration glassDecoration({
-    BorderRadius? borderRadius,
-    Color? color,
-    double blur = 10.0,
-  }) {
-    return BoxDecoration(
-      color: color ?? glassWhite,
-      borderRadius: borderRadius ?? brMedium,
-      border: Border.all(color: Colors.white.withOpacity(0.1), width: 0.5),
-    );
-  }
-
-  static List<BoxShadow> premiumShadows() {
+  // --- Elevation & Shadows ---
+  static List<BoxShadow> softShadow(BuildContext context) {
+    bool isDark = Theme.of(context).brightness == Brightness.dark;
     return [
       BoxShadow(
-        color: Colors.black.withOpacity(0.3),
+        color: isDark
+            ? Colors.black.withOpacity(0.4)
+            : Colors.black.withOpacity(0.05),
         blurRadius: 20,
         offset: const Offset(0, 10),
-      ),
-      BoxShadow(
-        color: primary.withOpacity(0.1),
-        blurRadius: 15,
-        offset: const Offset(0, 5),
       ),
     ];
   }
 
-  // --- Glass Widget ---
-  static Widget glassMaterial({
-    required Widget child,
+  // --- Glassmorphism ---
+  static BoxDecoration glass({
+    required BuildContext context,
+    double opacity = 0.1,
     BorderRadius? borderRadius,
+  }) {
+    bool isDark = Theme.of(context).brightness == Brightness.dark;
+    return BoxDecoration(
+      color: isDark
+          ? Colors.white.withOpacity(opacity)
+          : Colors.black.withOpacity(0.03),
+      borderRadius: borderRadius ?? BorderRadius.circular(24),
+      border: Border.all(
+        color: isDark
+            ? Colors.white.withOpacity(0.1)
+            : Colors.white.withOpacity(0.5),
+        width: 0.5,
+      ),
+    );
+  }
+
+  static Widget glassLayer({
+    required Widget child,
     double blur = 15.0,
+    BorderRadius? borderRadius,
   }) {
     return ClipRRect(
-      borderRadius: borderRadius ?? brMedium,
+      borderRadius: borderRadius ?? BorderRadius.circular(24),
       child: BackdropFilter(
         filter: ImageFilter.blur(sigmaX: blur, sigmaY: blur),
         child: child,
@@ -85,18 +87,109 @@ class UDesign {
     );
   }
 
-  // --- Theme ---
-  static ThemeData get darkTheme {
+  // --- Shimmer Effect (Utility for Loading) ---
+  static Widget shimmer({required Widget child, required bool isDarkMode}) {
+    return ShaderMask(
+      blendMode: BlendMode.srcATop,
+      shaderCallback: (bounds) {
+        return LinearGradient(
+          colors: isDarkMode
+              ? [darkAccent, darkSurface, darkAccent]
+              : [lightAccent, lightSurface, lightAccent],
+          stops: const [0.1, 0.5, 0.9],
+        ).createShader(bounds);
+      },
+      child: child,
+    );
+  }
+
+  // --- Typography ---
+  static TextStyle h1(BuildContext context) => TextStyle(
+    fontSize: 32,
+    fontWeight: FontWeight.w800,
+    letterSpacing: -1,
+    color: Theme.of(context).brightness == Brightness.dark
+        ? textHighDark
+        : textHighLight,
+  );
+
+  static TextStyle body(BuildContext context) => TextStyle(
+    fontSize: 16,
+    fontWeight: FontWeight.w400,
+    color: Theme.of(context).brightness == Brightness.dark
+        ? textMedDark
+        : textMedLight,
+  );
+
+  // --- Themes ---
+  static ThemeData get premiumDark {
     return ThemeData(
       useMaterial3: true,
       brightness: Brightness.dark,
-      scaffoldBackgroundColor: background,
+      scaffoldBackgroundColor: darkBg,
+      primaryColor: primary,
       colorScheme: const ColorScheme.dark(
         primary: primary,
         secondary: secondary,
-        surface: surface,
+        surface: darkSurface,
+        onSurface: textHighDark,
       ),
-      // Removing problematic cardTheme to ensure cross-platform compatibility
+      cardTheme: CardThemeData(
+        color: darkSurface,
+        elevation: 0,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+      ),
+    );
+  }
+
+  static ThemeData get premiumLight {
+    return ThemeData(
+      useMaterial3: true,
+      brightness: Brightness.light,
+      scaffoldBackgroundColor: lightBg,
+      primaryColor: primary,
+      colorScheme: const ColorScheme.light(
+        primary: primary,
+        secondary: secondary,
+        surface: lightSurface,
+        onSurface: textHighLight,
+      ),
+      cardTheme: CardThemeData(
+        color: lightSurface,
+        elevation: 0,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(24),
+          side: BorderSide(color: Colors.black.withOpacity(0.05), width: 0.5),
+        ),
+      ),
+    );
+  }
+}
+
+// --- Micro-Interactions & Animations ---
+class UAnim extends StatelessWidget {
+  final Widget child;
+  final Duration duration;
+  const UAnim({
+    super.key,
+    required this.child,
+    this.duration = const Duration(milliseconds: 300),
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedSwitcher(
+      duration: duration,
+      transitionBuilder: (child, animation) {
+        return FadeTransition(
+          opacity: animation,
+          child: ScaleTransition(
+            scale: Tween<double>(begin: 0.95, end: 1.0).animate(animation),
+            child: child,
+          ),
+        );
+      },
+      child: child,
     );
   }
 }

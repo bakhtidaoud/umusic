@@ -6,6 +6,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import '../services/extraction_service.dart';
 import '../controllers/config_controller.dart';
 import '../controllers/download_controller.dart';
+import '../utils/design_system.dart';
 
 class DownloaderScreen extends StatefulWidget {
   final String? initialUrl;
@@ -89,6 +90,7 @@ class _DownloaderScreenState extends State<DownloaderScreen> {
   @override
   Widget build(BuildContext context) {
     final downloadController = Get.find<DownloadController>();
+    bool isDark = Theme.of(context).brightness == Brightness.dark;
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
@@ -102,7 +104,6 @@ class _DownloaderScreenState extends State<DownloaderScreen> {
             ),
           if (_currentMetadata != null) _buildMetadataCard(context),
           _buildDownloadsList(context, downloadController),
-
           Obx(() {
             if (_currentMetadata == null &&
                 !_isLoading &&
@@ -124,6 +125,10 @@ class _DownloaderScreenState extends State<DownloaderScreen> {
                         child: SvgPicture.asset(
                           'assets/app_icon.svg',
                           width: 200,
+                          colorFilter: ColorFilter.mode(
+                            isDark ? Colors.white : Colors.black,
+                            BlendMode.srcIn,
+                          ),
                         ),
                       ),
                     ),
@@ -139,27 +144,36 @@ class _DownloaderScreenState extends State<DownloaderScreen> {
   }
 
   Widget _buildInputSection(BuildContext context) {
-    return Card(
-      elevation: 0,
-      color: Theme.of(context).colorScheme.surfaceVariant.withOpacity(0.3),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
+    bool isDark = Theme.of(context).brightness == Brightness.dark;
+    return UDesign.glassLayer(
+      borderRadius: BorderRadius.circular(24),
+      child: Container(
+        decoration: UDesign.glass(context: context),
+        padding: const EdgeInsets.all(8.0),
         child: Row(
           children: [
+            const SizedBox(width: 16),
+            const Icon(Icons.link_rounded, color: UDesign.primary),
+            const SizedBox(width: 12),
             Expanded(
               child: TextField(
                 controller: _urlController,
+                style: GoogleFonts.outfit(
+                  color: isDark ? UDesign.textHighDark : UDesign.textHighLight,
+                ),
                 decoration: InputDecoration(
                   hintText: 'Paste video URL here...',
                   border: InputBorder.none,
-                  hintStyle: GoogleFonts.outfit(),
+                  hintStyle: GoogleFonts.outfit(
+                    color: isDark ? UDesign.textMedDark : UDesign.textMedLight,
+                  ),
                 ),
                 onSubmitted: (_) => _fetchMetadata(),
               ),
             ),
             IconButton.filled(
               onPressed: _fetchMetadata,
+              style: IconButton.styleFrom(backgroundColor: UDesign.primary),
               icon: const Icon(Icons.analytics_rounded),
             ),
           ],
@@ -169,67 +183,122 @@ class _DownloaderScreenState extends State<DownloaderScreen> {
   }
 
   Widget _buildMetadataCard(BuildContext context) {
-    final theme = Theme.of(context);
-    return Card(
-      margin: const EdgeInsets.symmetric(vertical: 16),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-      clipBehavior: Clip.antiAlias,
-      child: Column(
-        children: [
-          if (_currentMetadata!.thumbnailUrl != null)
-            Image.network(
-              _currentMetadata!.thumbnailUrl!,
-              height: 200,
-              width: double.infinity,
-              fit: BoxFit.cover,
-            ),
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  _currentMetadata!.title,
-                  style: GoogleFonts.outfit(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
+    bool isDark = Theme.of(context).brightness == Brightness.dark;
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 24),
+      child: UDesign.glassLayer(
+        borderRadius: BorderRadius.circular(32),
+        child: Container(
+          decoration: UDesign.glass(
+            context: context,
+          ).copyWith(boxShadow: UDesign.softShadow(context)),
+          clipBehavior: Clip.antiAlias,
+          child: Column(
+            children: [
+              if (_currentMetadata!.thumbnailUrl != null)
+                Image.network(
+                  _currentMetadata!.thumbnailUrl!,
+                  height: 200,
+                  width: double.infinity,
+                  fit: BoxFit.cover,
                 ),
-                Text(
-                  _currentMetadata!.author ?? 'Unknown Author',
-                  style: theme.textTheme.bodyMedium,
-                ),
-                const Divider(height: 24),
-                Row(
+              Padding(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Expanded(
-                      child: DropdownButton<YtDlpFormat>(
-                        value: _selectedQuality,
-                        isExpanded: true,
-                        items: _currentMetadata!.formats.map((f) {
-                          return DropdownMenuItem(
-                            value: f,
-                            child: Text(
-                              '${f.resolution ?? ''} (${f.ext}) ${f.filesizeMb?.toStringAsFixed(1) ?? ''} MB',
-                            ),
-                          );
-                        }).toList(),
-                        onChanged: (val) =>
-                            setState(() => _selectedQuality = val),
+                    Text(
+                      _currentMetadata!.title,
+                      style: GoogleFonts.outfit(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: isDark
+                            ? UDesign.textHighDark
+                            : UDesign.textHighLight,
+                        height: 1.2,
                       ),
                     ),
-                    const SizedBox(width: 16),
-                    ElevatedButton.icon(
-                      onPressed: _startDownload,
-                      icon: const Icon(Icons.download),
-                      label: const Text('Download'),
+                    const SizedBox(height: 8),
+                    Text(
+                      _currentMetadata!.author ?? 'Unknown Author',
+                      style: GoogleFonts.outfit(
+                        color: isDark
+                            ? UDesign.textMedDark
+                            : UDesign.textMedLight,
+                        fontSize: 14,
+                      ),
+                    ),
+                    const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 20),
+                      child: Divider(color: Colors.white12),
+                    ),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 16),
+                            decoration: BoxDecoration(
+                              color: isDark
+                                  ? Colors.white.withOpacity(0.05)
+                                  : Colors.black.withOpacity(0.05),
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                            child: DropdownButtonHideUnderline(
+                              child: DropdownButton<YtDlpFormat>(
+                                value: _selectedQuality,
+                                isExpanded: true,
+                                dropdownColor: Theme.of(
+                                  context,
+                                ).colorScheme.surface,
+                                style: GoogleFonts.outfit(
+                                  color: isDark
+                                      ? UDesign.textHighDark
+                                      : UDesign.textHighLight,
+                                ),
+                                icon: const Icon(
+                                  Icons.arrow_drop_down_rounded,
+                                  color: UDesign.primary,
+                                ),
+                                items: _currentMetadata!.formats.map((f) {
+                                  return DropdownMenuItem(
+                                    value: f,
+                                    child: Text(
+                                      '${f.resolution ?? ''} (${f.ext}) ${f.filesizeMb?.toStringAsFixed(1) ?? ''} MB',
+                                    ),
+                                  );
+                                }).toList(),
+                                onChanged: (val) =>
+                                    setState(() => _selectedQuality = val),
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        ElevatedButton.icon(
+                          onPressed: _startDownload,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: UDesign.primary,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 12,
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                            elevation: 0,
+                          ),
+                          icon: const Icon(Icons.download_rounded),
+                          label: const Text('Download'),
+                        ),
+                      ],
                     ),
                   ],
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     ).animate().fadeIn().slideY(begin: 0.1, end: 0);
   }
@@ -238,6 +307,7 @@ class _DownloaderScreenState extends State<DownloaderScreen> {
     BuildContext context,
     DownloadController controller,
   ) {
+    bool isDark = Theme.of(context).brightness == Brightness.dark;
     return Obx(() {
       if (controller.tasks.isEmpty) return const SizedBox.shrink();
 
@@ -245,12 +315,13 @@ class _DownloaderScreenState extends State<DownloaderScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Padding(
-            padding: const EdgeInsets.symmetric(vertical: 16),
+            padding: const EdgeInsets.symmetric(vertical: 24),
             child: Text(
               'Active Downloads',
               style: GoogleFonts.outfit(
-                fontSize: 20,
+                fontSize: 22,
                 fontWeight: FontWeight.bold,
+                color: isDark ? UDesign.textHighDark : UDesign.textHighLight,
               ),
             ),
           ),
@@ -267,46 +338,84 @@ class _DownloaderScreenState extends State<DownloaderScreen> {
     DownloadTask task,
     DownloadController controller,
   ) {
-    return Card(
-      margin: const EdgeInsets.only(bottom: 8),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child: ListTile(
-        title: Text(
-          task.fileName,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-        ),
-        subtitle: Obx(
-          () => Column(
-            children: [
-              const SizedBox(height: 8),
-              LinearProgressIndicator(
-                value: task.progress.value,
-                borderRadius: BorderRadius.circular(4),
+    bool isDark = Theme.of(context).brightness == Brightness.dark;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: UDesign.glassLayer(
+        borderRadius: BorderRadius.circular(24),
+        child: Container(
+          decoration: UDesign.glass(context: context),
+          child: ListTile(
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 20,
+              vertical: 8,
+            ),
+            title: Text(
+              task.fileName,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: GoogleFonts.outfit(
+                fontWeight: FontWeight.w600,
+                color: isDark ? UDesign.textHighDark : UDesign.textHighLight,
               ),
-              const SizedBox(height: 4),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            ),
+            subtitle: Obx(
+              () => Column(
                 children: [
-                  Text('${(task.progress.value * 100).toStringAsFixed(1)}%'),
-                  if (task.status.value == DownloadStatus.downloading)
-                    Text('${_formatSpeed(task.transferRate.value)} MB/s'),
+                  const SizedBox(height: 12),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(10),
+                    child: LinearProgressIndicator(
+                      value: task.progress.value,
+                      minHeight: 6,
+                      backgroundColor: isDark
+                          ? Colors.white10
+                          : Colors.black.withOpacity(0.1),
+                      valueColor: const AlwaysStoppedAnimation<Color>(
+                        UDesign.primary,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        '${(task.progress.value * 100).toStringAsFixed(1)}%',
+                        style: GoogleFonts.outfit(
+                          fontSize: 12,
+                          color: isDark
+                              ? UDesign.textMedDark
+                              : UDesign.textMedLight,
+                        ),
+                      ),
+                      if (task.status.value == DownloadStatus.downloading)
+                        Text(
+                          '${_formatSpeed(task.transferRate.value)} MB/s',
+                          style: GoogleFonts.outfit(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            color: UDesign.primary,
+                          ),
+                        ),
+                    ],
+                  ),
                 ],
               ),
-            ],
-          ),
-        ),
-        trailing: Obx(
-          () => IconButton(
-            icon: Icon(
-              task.status.value == DownloadStatus.completed
-                  ? Icons.check_circle_rounded
-                  : Icons.cancel_rounded,
-              color: task.status.value == DownloadStatus.completed
-                  ? Colors.green
-                  : Colors.grey,
             ),
-            onPressed: () => controller.cancelDownload(task.url),
+            trailing: Obx(
+              () => IconButton(
+                icon: Icon(
+                  task.status.value == DownloadStatus.completed
+                      ? Icons.check_circle_rounded
+                      : Icons.close_rounded,
+                  color: task.status.value == DownloadStatus.completed
+                      ? Colors.greenAccent
+                      : (isDark ? UDesign.textMedDark : UDesign.textMedLight),
+                ),
+                onPressed: () => controller.cancelDownload(task.url),
+              ),
+            ),
           ),
         ),
       ),

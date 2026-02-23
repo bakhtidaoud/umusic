@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:get/get.dart';
 import '../controllers/cookie_controller.dart';
+import '../controllers/home_controller.dart';
 
 class LoginWebViewScreen extends StatefulWidget {
   final String initialUrl;
@@ -30,6 +31,12 @@ class _LoginWebViewScreenState extends State<LoginWebViewScreen> {
                 final currentUrl = await _webViewController!.getUrl();
                 if (currentUrl != null) {
                   await cookieController.extractAndSaveCookies(currentUrl);
+
+                  // Refresh videos on home screen after login
+                  if (Get.isRegistered<HomeController>()) {
+                    Get.find<HomeController>().fetchVideos();
+                  }
+
                   if (context.mounted) Navigator.pop(context);
                 }
               }
@@ -51,6 +58,13 @@ class _LoginWebViewScreenState extends State<LoginWebViewScreen> {
               setState(() => _isLoading = false);
               if (url != null) {
                 await cookieController.extractAndSaveCookies(url);
+                // Trigger refresh if we reached a successful login state (optional but helpful)
+                if (url.toString().contains('youtube.com') &&
+                    !url.toString().contains('ServiceLogin')) {
+                  if (Get.isRegistered<HomeController>()) {
+                    Get.find<HomeController>().fetchVideos();
+                  }
+                }
               }
             },
           ),

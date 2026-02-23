@@ -14,18 +14,17 @@ class LocalLibraryScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    bool isDark = Theme.of(context).brightness == Brightness.dark;
     final controller = Get.put(LibraryController());
     final TextEditingController searchTeco = TextEditingController();
-
-    return Container(
-      color: UDesign.background,
-      child: Column(
+    return Scaffold(
+      body: Column(
         children: [
           _buildSearchBar(context, controller, searchTeco),
           Expanded(
             child: RefreshIndicator(
               color: UDesign.primary,
-              backgroundColor: UDesign.surface,
+              backgroundColor: Theme.of(context).colorScheme.surface,
               onRefresh: () => controller.scanFiles(),
               child: Obx(() {
                 if (controller.isLoading.value) {
@@ -33,7 +32,7 @@ class LocalLibraryScreen extends StatelessWidget {
                 }
 
                 if (controller.filteredFiles.isEmpty) {
-                  return _buildEmptyState();
+                  return _buildEmptyState(context);
                 }
 
                 return AnimationLimiter(
@@ -68,23 +67,24 @@ class LocalLibraryScreen extends StatelessWidget {
     LibraryController controller,
     TextEditingController teco,
   ) {
+    bool isDark = Theme.of(context).brightness == Brightness.dark;
     return Padding(
       padding: const EdgeInsets.all(20.0),
-      child: UDesign.glassMaterial(
-        borderRadius: UDesign.brLarge,
+      child: UDesign.glassLayer(
+        borderRadius: BorderRadius.circular(24),
         child: Container(
-          decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.05),
-            borderRadius: UDesign.brLarge,
-            border: Border.all(color: Colors.white.withOpacity(0.1)),
-          ),
+          decoration: UDesign.glass(context: context),
           child: TextField(
             controller: teco,
             onChanged: (val) => controller.search(val),
-            style: GoogleFonts.outfit(color: Colors.white),
+            style: GoogleFonts.outfit(
+              color: isDark ? UDesign.textHighDark : UDesign.textHighLight,
+            ),
             decoration: InputDecoration(
               hintText: 'Search local library...',
-              hintStyle: GoogleFonts.outfit(color: Colors.white38),
+              hintStyle: GoogleFonts.outfit(
+                color: isDark ? UDesign.textMedDark : UDesign.textMedLight,
+              ),
               prefixIcon: const Icon(
                 Icons.search_rounded,
                 color: UDesign.primary,
@@ -111,6 +111,7 @@ class LocalLibraryScreen extends StatelessWidget {
     LibraryController controller,
   ) {
     final isVideo = ['.mp4', '.mkv', '.webm'].contains(file.extension);
+    bool isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 16.0),
@@ -127,19 +128,15 @@ class LocalLibraryScreen extends StatelessWidget {
           }
         },
         onLongPress: () => _confirmDelete(context, file, controller),
-        borderRadius: UDesign.brMedium,
-        child: UDesign.glassMaterial(
-          borderRadius: UDesign.brMedium,
+        borderRadius: BorderRadius.circular(24),
+        child: UDesign.glassLayer(
+          borderRadius: BorderRadius.circular(24),
           child: Container(
             padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.03),
-              borderRadius: UDesign.brMedium,
-              border: Border.all(color: Colors.white.withOpacity(0.05)),
-            ),
+            decoration: UDesign.glass(context: context),
             child: Row(
               children: [
-                _buildThumbnail(file, isVideo),
+                _buildThumbnail(context, file, isVideo),
                 const SizedBox(width: 16),
                 Expanded(
                   child: Column(
@@ -152,7 +149,9 @@ class LocalLibraryScreen extends StatelessWidget {
                         style: GoogleFonts.outfit(
                           fontSize: 16,
                           fontWeight: FontWeight.w600,
-                          color: Colors.white,
+                          color: isDark
+                              ? UDesign.textHighDark
+                              : UDesign.textHighLight,
                         ),
                       ),
                       const SizedBox(height: 4),
@@ -160,7 +159,9 @@ class LocalLibraryScreen extends StatelessWidget {
                         '${_formatSize(file.size)} • ${file.extension.toUpperCase().replaceAll('.', '')}',
                         style: GoogleFonts.outfit(
                           fontSize: 13,
-                          color: Colors.white54,
+                          color: isDark
+                              ? UDesign.textMedDark
+                              : UDesign.textMedLight,
                         ),
                       ),
                     ],
@@ -180,51 +181,56 @@ class LocalLibraryScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildThumbnail(LocalFile file, bool isVideo) {
+  Widget _buildThumbnail(BuildContext context, LocalFile file, bool isVideo) {
+    bool isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       width: 80,
       height: 60,
       decoration: BoxDecoration(
-        color: UDesign.surface,
-        borderRadius: UDesign.brSmall,
+        color: Theme.of(context).colorScheme.surface,
+        borderRadius: BorderRadius.circular(12),
       ),
       child: ClipRRect(
-        borderRadius: UDesign.brSmall,
+        borderRadius: BorderRadius.circular(12),
         child: file.thumbnailPath != null
             ? Image.file(File(file.thumbnailPath!), fit: BoxFit.cover)
             : Icon(
                 isVideo
                     ? Icons.movie_creation_rounded
                     : Icons.music_note_rounded,
-                color: Colors.white24,
+                color: isDark ? Colors.white24 : Colors.black.withOpacity(0.24),
               ),
       ),
     );
   }
 
-  Widget _buildEmptyState() {
+  Widget _buildEmptyState(BuildContext context) {
+    bool isDark = Theme.of(context).brightness == Brightness.dark;
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          const Icon(
+          Icon(
             Icons.library_books_rounded,
             size: 80,
-            color: Colors.white10,
+            color: isDark ? Colors.white10 : Colors.black.withOpacity(0.1),
           ),
           const SizedBox(height: 20),
           Text(
             'Library is empty',
             style: GoogleFonts.outfit(
               fontSize: 20,
-              color: Colors.white38,
+              color: isDark ? UDesign.textMedDark : UDesign.textMedLight,
               fontWeight: FontWeight.bold,
             ),
           ),
           const SizedBox(height: 10),
           Text(
             'Go download some awesome content!',
-            style: GoogleFonts.outfit(fontSize: 14, color: Colors.white24),
+            style: GoogleFonts.outfit(
+              fontSize: 14,
+              color: isDark ? UDesign.textMedDark : UDesign.textMedLight,
+            ),
           ),
         ],
       ),
@@ -243,17 +249,22 @@ class LocalLibraryScreen extends StatelessWidget {
     LocalFile file,
     LibraryController controller,
   ) {
+    bool isDark = Theme.of(context).brightness == Brightness.dark;
     Get.dialog(
       AlertDialog(
-        backgroundColor: UDesign.surface,
-        shape: RoundedRectangleBorder(borderRadius: UDesign.brMedium),
+        backgroundColor: Theme.of(context).colorScheme.surface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
         title: Text(
           'Delete File?',
-          style: GoogleFonts.outfit(color: Colors.white),
+          style: GoogleFonts.outfit(
+            color: isDark ? UDesign.textHighDark : UDesign.textHighLight,
+          ),
         ),
         content: Text(
           'Are you sure you want to delete "${file.name}" permanentely?',
-          style: GoogleFonts.outfit(color: Colors.white70),
+          style: GoogleFonts.outfit(
+            color: isDark ? UDesign.textMedDark : UDesign.textMedLight,
+          ),
         ),
         actions: [
           TextButton(onPressed: () => Get.back(), child: const Text('Cancel')),

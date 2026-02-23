@@ -3,6 +3,7 @@ import 'package:webview_flutter/webview_flutter.dart';
 import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../controllers/cookie_controller.dart';
+import '../controllers/home_controller.dart';
 
 class BrowserScreen extends StatefulWidget {
   final String initialUrl;
@@ -35,7 +36,29 @@ class _BrowserScreenState extends State<BrowserScreen> {
           onPageFinished: (url) async {
             setState(() => _isLoading = false);
             final cookieController = Get.find<CookieController>();
+            final homeController = Get.find<HomeController>();
+
+            // Extract cookies
             await cookieController.extractAndSaveCookies(Uri.parse(url));
+
+            // Check if we are logged in now
+            await homeController.checkLoginStatus();
+
+            if (homeController.isLoggedIn.value &&
+                (url.contains('youtube.com') ||
+                    url.contains('accounts.google.com/CheckCookie') ||
+                    url.contains('myaccount.google.com'))) {
+              // Automatic close and refresh
+              Get.back();
+              homeController.fetchVideos();
+              Get.snackbar(
+                'Success',
+                'Logged in successfully! Refreshing your feed...',
+                snackPosition: SnackPosition.BOTTOM,
+                backgroundColor: Colors.green.withOpacity(0.8),
+                colorText: Colors.white,
+              );
+            }
           },
         ),
       )

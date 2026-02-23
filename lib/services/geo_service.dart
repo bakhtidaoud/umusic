@@ -62,6 +62,7 @@ class GeoService extends GetxService {
     } catch (e) {
       debugPrint('GeoService: Error fetching country code: $e');
     }
+    debugPrint('GeoService: Using fallback country code: ${countryCode.value}');
     return countryCode.value;
   }
 

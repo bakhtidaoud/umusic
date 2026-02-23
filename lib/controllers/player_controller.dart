@@ -30,6 +30,10 @@ class PlayerController extends GetxController {
   var isLocalFile = false.obs;
   var errorMessage = ''.obs;
 
+  // Playlist / Queue management
+  var currentPlaylist = <String>[].obs; // URL list
+  var currentIndex = 0.obs;
+
   @override
   void onInit() {
     super.onInit();
@@ -125,10 +129,7 @@ class PlayerController extends GetxController {
 
       podController!.addListener(() {
         if (!isBackgroundMode.value && !isLocalFile.value) {
-          final vControl = (podController as dynamic).videoPlayerController;
-          if (vControl != null) {
-            isPlaying.value = vControl.value.isPlaying;
-          }
+          isPlaying.value = podController?.videoPlayerValue?.isPlaying ?? false;
         }
       });
 
@@ -165,10 +166,7 @@ class PlayerController extends GetxController {
       podController!.play();
 
       podController!.addListener(() {
-        final vControl = (podController as dynamic).videoPlayerController;
-        if (vControl != null) {
-          isPlaying.value = vControl.value.isPlaying;
-        }
+        isPlaying.value = podController?.videoPlayerValue?.isPlaying ?? false;
       });
     } else {
       isBackgroundMode.value = true;
@@ -189,6 +187,30 @@ class PlayerController extends GetxController {
     }
 
     showMiniPlayer.value = true;
+  }
+
+  void setPlaylist(List<String> urls, int startIndex) {
+    currentPlaylist.assignAll(urls);
+    currentIndex.value = startIndex;
+  }
+
+  void playNext() {
+    if (currentPlaylist.isNotEmpty &&
+        currentIndex.value < currentPlaylist.length - 1) {
+      currentIndex.value++;
+      initPlayer(currentPlaylist[currentIndex.value]);
+    } else {
+      Get.snackbar('Queue', 'End of playlist');
+    }
+  }
+
+  void playPrevious() {
+    if (currentPlaylist.isNotEmpty && currentIndex.value > 0) {
+      currentIndex.value--;
+      initPlayer(currentPlaylist[currentIndex.value]);
+    } else {
+      Get.snackbar('Queue', 'Beginning of playlist');
+    }
   }
 
   void toggleBackgroundMode(bool value) async {
@@ -212,8 +234,7 @@ class PlayerController extends GetxController {
           ),
         );
 
-        if ((podController as dynamic).videoPlayerController?.value.isPlaying ??
-            false) {
+        if (podController?.videoPlayerValue?.isPlaying ?? false) {
           podController!.pause();
           _audioPlayer.play();
         }
@@ -228,10 +249,7 @@ class PlayerController extends GetxController {
       if (_audioPlayer.playing) {
         await _audioPlayer.pause();
         if (podController != null) {
-          final vControl = (podController as dynamic).videoPlayerController;
-          if (vControl != null) {
-            await vControl.seekTo(_audioPlayer.position);
-          }
+          await podController!.videoSeekTo(_audioPlayer.position);
           podController!.play();
         }
       }
@@ -250,8 +268,7 @@ class PlayerController extends GetxController {
     }
 
     if (podController == null) return;
-    final vControl = (podController as dynamic).videoPlayerController;
-    if (vControl != null && (vControl.value.isPlaying as bool)) {
+    if (podController?.videoPlayerValue?.isPlaying ?? false) {
       podController!.pause();
     } else {
       podController!.play();
@@ -267,6 +284,7 @@ class PlayerController extends GetxController {
     showMiniPlayer.value = false;
     podController?.pause();
     _audioPlayer.stop();
+    isPlaying.value = false;
     currentVideoUrl.value = '';
   }
 

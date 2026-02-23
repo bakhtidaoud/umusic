@@ -43,21 +43,23 @@ class HomeScreen extends StatelessWidget {
                   return Column(
                     children: [
                       if (!controller.isLoggedIn.value &&
-                          controller.currentQuery.value == 'trending music')
+                          controller.currentQuery.value == 'trending')
                         _buildLoginPrompt(context),
                       const SizedBox.shrink(),
                     ],
                   );
                 }),
               ),
-              Obx(() {
-                final networkService = Get.find<NetworkService>();
-                if (!networkService.isConnected.value &&
-                    controller.videos.isEmpty) {
-                  return const SliverToBoxAdapter(child: SizedBox.shrink());
-                }
-                return _buildVideoGrid(context, controller);
-              }),
+              SliverToBoxAdapter(
+                child: Obx(() {
+                  final networkService = Get.find<NetworkService>();
+                  if (!networkService.isConnected.value &&
+                      controller.videos.isEmpty) {
+                    return const SizedBox.shrink();
+                  }
+                  return _buildVideoGrid(context, controller);
+                }),
+              ),
               const SliverToBoxAdapter(child: SizedBox(height: 100)),
             ],
           ),
@@ -129,6 +131,29 @@ class HomeScreen extends StatelessWidget {
         ),
         onPressed: () => Scaffold.of(context).openDrawer(),
       ),
+      actions: [
+        Obx(() {
+          if (controller.isLoggedIn.value &&
+              controller.userImageUrl.value.isNotEmpty) {
+            return Padding(
+              padding: const EdgeInsets.only(right: 16),
+              child: GestureDetector(
+                onTap: () => Get.to(
+                  () => const BrowserScreen(
+                    initialUrl: 'https://www.youtube.com/',
+                  ),
+                ),
+                child: CircleAvatar(
+                  radius: 18,
+                  backgroundColor: UDesign.primary.withOpacity(0.1),
+                  backgroundImage: NetworkImage(controller.userImageUrl.value),
+                ),
+              ),
+            ).animate().fadeIn().scale();
+          }
+          return const SizedBox.shrink();
+        }),
+      ],
       flexibleSpace: FlexibleSpaceBar(
         background: Container(
           decoration: BoxDecoration(
@@ -162,7 +187,7 @@ class HomeScreen extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _buildWelcomeHeader(cookieController),
+                    _buildWelcomeHeader(context, cookieController),
                     const SizedBox(height: 20),
                     _buildSearchBar(context, controller),
                   ],
@@ -175,40 +200,40 @@ class HomeScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildWelcomeHeader(CookieController cookieController) {
-    return FutureBuilder<String?>(
-      future: cookieController.getCookieString(
-        Uri.parse('https://www.youtube.com'),
-      ),
-      builder: (context, snapshot) {
-        bool isLoggedIn = snapshot.hasData && snapshot.data != null;
-        bool isDark = Theme.of(context).brightness == Brightness.dark;
+  Widget _buildWelcomeHeader(
+    BuildContext context,
+    CookieController cookieController,
+  ) {
+    final controller = Get.find<HomeController>();
+    return Obx(() {
+      bool isLoggedIn = controller.isLoggedIn.value;
+      bool isDark = Theme.of(context).brightness == Brightness.dark;
+      String name = controller.userName.value;
 
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              isLoggedIn ? 'Welcome back,' : 'Welcome to,',
-              style: GoogleFonts.outfit(
-                fontSize: 16,
-                color: UDesign.primary,
-                fontWeight: FontWeight.w500,
-              ),
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            isLoggedIn ? 'Welcome back,' : 'Welcome to,',
+            style: GoogleFonts.outfit(
+              fontSize: 16,
+              color: UDesign.primary,
+              fontWeight: FontWeight.w500,
             ),
-            Text(
-              isLoggedIn ? 'Music Lover' : 'uMusic Premium',
-              style: GoogleFonts.outfit(
-                fontSize: 32,
-                fontWeight: FontWeight.bold,
-                color: isDark ? UDesign.textHighDark : UDesign.textHighLight,
-                letterSpacing: -1,
-              ),
+          ),
+          Text(
+            isLoggedIn ? name : 'uMusic Premium',
+            style: GoogleFonts.outfit(
+              fontSize: 32,
+              fontWeight: FontWeight.bold,
+              color: isDark ? UDesign.textHighDark : UDesign.textHighLight,
+              letterSpacing: -1,
             ),
-          ],
-        ).animate().fadeIn().slideX(begin: -0.1);
-      },
-    );
+          ),
+        ],
+      ).animate().fadeIn().slideX(begin: -0.1);
+    });
   }
 
   Widget _buildSearchBar(BuildContext context, HomeController controller) {
@@ -242,74 +267,82 @@ class HomeScreen extends StatelessWidget {
       child: Container(
         height: 60,
         margin: const EdgeInsets.symmetric(vertical: 8),
-        child: ListView.builder(
-          scrollDirection: Axis.horizontal,
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          itemCount: controller.categories.length,
-          itemBuilder: (context, index) {
-            final category = controller.categories[index];
-            return Obx(() {
-              final isSelected = controller.currentCategory.value == category;
-              return Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 6,
-                  vertical: 10,
-                ),
-                child: InkWell(
-                  onTap: () => controller.setCategory(category),
-                  borderRadius: BorderRadius.circular(20),
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 250),
-                    padding: const EdgeInsets.symmetric(horizontal: 18),
-                    alignment: Alignment.center,
-                    decoration: BoxDecoration(
-                      color: isSelected
-                          ? UDesign.primary
-                          : Colors.white.withOpacity(0.05),
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(
+        child: Obx(() {
+          final cats = controller.dynamicCategories.isNotEmpty
+              ? controller.dynamicCategories
+              : controller.categories;
+
+          return ListView.builder(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            itemCount: cats.length,
+            itemBuilder: (context, index) {
+              final category = cats[index];
+              return Obx(() {
+                final isSelected = controller.currentCategory.value == category;
+                return Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 6,
+                    vertical: 10,
+                  ),
+                  child: InkWell(
+                    onTap: () => controller.setCategory(category),
+                    borderRadius: BorderRadius.circular(20),
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 250),
+                      padding: const EdgeInsets.symmetric(horizontal: 18),
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
                         color: isSelected
                             ? UDesign.primary
-                            : Colors.white.withOpacity(0.1),
+                            : Colors.white.withOpacity(0.05),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(
+                          color: isSelected
+                              ? UDesign.primary
+                              : Colors.white.withOpacity(0.1),
+                        ),
+                        boxShadow: isSelected
+                            ? [
+                                BoxShadow(
+                                  color: UDesign.primary.withOpacity(0.3),
+                                  blurRadius: 10,
+                                ),
+                              ]
+                            : null,
                       ),
-                      boxShadow: isSelected
-                          ? [
-                              BoxShadow(
-                                color: UDesign.primary.withOpacity(0.3),
-                                blurRadius: 10,
-                              ),
-                            ]
-                          : null,
-                    ),
-                    child: Text(
-                      category,
-                      style: GoogleFonts.outfit(
-                        color: isSelected ? Colors.black : Colors.white70,
-                        fontWeight: isSelected
-                            ? FontWeight.bold
-                            : FontWeight.w500,
-                        fontSize: 14,
+                      child: Text(
+                        category,
+                        style: GoogleFonts.outfit(
+                          color: isSelected ? Colors.black : Colors.white70,
+                          fontWeight: isSelected
+                              ? FontWeight.bold
+                              : FontWeight.w500,
+                          fontSize: 14,
+                        ),
                       ),
                     ),
-                  ),
-                ).animate().scale(begin: const Offset(0.9, 0.9)),
-              );
-            });
-          },
-        ),
+                  ).animate().scale(begin: const Offset(0.9, 0.9)),
+                );
+              });
+            },
+          );
+        }),
       ),
     );
   }
 
   Widget _buildVideoGrid(BuildContext context, HomeController controller) {
-    if (controller.videos.isEmpty && controller.shorts.isEmpty)
-      return const SliverToBoxAdapter(child: SizedBox.shrink());
+    if (controller.videos.isEmpty && controller.shorts.isEmpty) {
+      return const SizedBox.shrink();
+    }
 
-    return SliverPadding(
+    return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-      sliver: SliverList(
-        delegate: SliverChildBuilderDelegate(
-          (context, index) {
+      child: Column(
+        children: List.generate(
+          controller.videos.length + (controller.shorts.isNotEmpty ? 1 : 0),
+          (index) {
             // Index logic to inject Shorts
             if (controller.shorts.isNotEmpty && index == 1) {
               return _buildShortsSection(context, controller);
@@ -318,7 +351,8 @@ class HomeScreen extends StatelessWidget {
             final videoIndex = (controller.shorts.isNotEmpty && index > 1)
                 ? index - 1
                 : index;
-            if (videoIndex >= controller.videos.length) return null;
+            if (videoIndex >= controller.videos.length)
+              return const SizedBox.shrink();
 
             final video = controller.videos[videoIndex];
             return Padding(
@@ -333,8 +367,6 @@ class HomeScreen extends StatelessWidget {
               ),
             );
           },
-          childCount:
-              controller.videos.length + (controller.shorts.isNotEmpty ? 1 : 0),
         ),
       ),
     );
@@ -670,7 +702,10 @@ class HomeScreen extends StatelessWidget {
                 ),
                 elevation: 0,
               ),
-            ).animate().shimmer(delay: const Duration(seconds: 1), duration: const Duration(seconds: 2)),
+            ).animate().shimmer(
+              delay: const Duration(seconds: 1),
+              duration: const Duration(seconds: 2),
+            ),
           ],
         ),
       ),

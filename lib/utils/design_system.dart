@@ -10,9 +10,9 @@ class UDesign {
   static const Color darkAccent = Color(0xFF1D1B2B);
 
   // Light Neutrals (Premium Light Mode)
-  static const Color lightBg = Color(0xFFF8F9FA); // Soft White
+  static const Color lightBg = Color(0xFFF1F5F9); // Very Soft Slate/White
   static const Color lightSurface = Colors.white;
-  static const Color lightAccent = Color(0xFFE9ECEF);
+  static const Color lightAccent = Color(0xFFE2E8F0); // Soft Border/Surface
 
   // Brand Colors
   static const Color primary = Color(0xFF6366F1); // Deep Indigo
@@ -20,10 +20,10 @@ class UDesign {
   static const Color accent = Color(0xFF22D3EE); // Pure Cyan
 
   // Text Colors
-  static const Color textHighDark = Color(0xFFF1F5F9);
+  static const Color textHighDark = Color(0xFFF8FAFC);
   static const Color textMedDark = Color(0xFF94A3B8);
-  static const Color textHighLight = Color(0xFF1E293B);
-  static const Color textMedLight = Color(0xFF64748B);
+  static const Color textHighLight = Color(0xFF0F172A); // Deep Navy/Black
+  static const Color textMedLight = Color(0xFF475569); // Slate Grey
 
   // --- Gradients ---
   static const LinearGradient premiumGradient = LinearGradient(
@@ -45,7 +45,7 @@ class UDesign {
       BoxShadow(
         color: isDark
             ? Colors.black.withOpacity(0.4)
-            : Colors.black.withOpacity(0.05),
+            : Colors.black.withOpacity(0.08),
         blurRadius: 20,
         offset: const Offset(0, 10),
       ),
@@ -62,12 +62,12 @@ class UDesign {
     return BoxDecoration(
       color: isDark
           ? Colors.white.withOpacity(opacity)
-          : Colors.black.withOpacity(0.03),
+          : Colors.white.withOpacity(0.7), // More solid white for light mode
       borderRadius: borderRadius ?? BorderRadius.circular(24),
       border: Border.all(
         color: isDark
             ? Colors.white.withOpacity(0.1)
-            : Colors.white.withOpacity(0.5),
+            : Colors.black.withOpacity(0.05),
         width: 0.5,
       ),
     );
@@ -133,6 +133,7 @@ class UDesign {
         secondary: secondary,
         surface: darkSurface,
         onSurface: textHighDark,
+        surfaceContainerHigh: darkAccent,
       ),
       cardTheme: CardThemeData(
         color: darkSurface,
@@ -148,11 +149,23 @@ class UDesign {
       brightness: Brightness.light,
       scaffoldBackgroundColor: lightBg,
       primaryColor: primary,
-      colorScheme: const ColorScheme.light(
+      colorScheme: ColorScheme.light(
         primary: primary,
         secondary: secondary,
         surface: lightSurface,
         onSurface: textHighLight,
+        surfaceContainerHigh: lightAccent,
+      ),
+      appBarTheme: const AppBarTheme(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        centerTitle: true,
+        iconTheme: IconThemeData(color: textHighLight),
+        titleTextStyle: TextStyle(
+          color: textHighLight,
+          fontSize: 20,
+          fontWeight: FontWeight.bold,
+        ),
       ),
       cardTheme: CardThemeData(
         color: lightSurface,

@@ -114,7 +114,10 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                       circleHandlerColor: UDesign.primary,
                     ),
                   ),
-                  _buildGestureOverlay(),
+                  // Double Tap Zones (Edges only to avoid blocking center tap)
+                  _buildSeekZones(),
+                  // Custom Center Controls (Next/Prev)
+                  _buildCenterControls(),
                 ],
               ),
             ),
@@ -306,18 +309,26 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
     );
   }
 
-  Widget _buildGestureOverlay() {
+  Widget _buildSeekZones() {
     return Row(
       children: [
+        // Backward Zone (Left 25%)
         Expanded(
+          flex: 1,
           child: GestureDetector(
             onDoubleTap: () => _seekRelative(const Duration(seconds: -10)),
+            behavior: HitTestBehavior.translucent,
             child: Container(color: Colors.transparent),
           ),
         ),
+        // Dead Zone (Center 50%) - Taps go to PodPlayer
+        const Expanded(flex: 2, child: SizedBox.expand()),
+        // Forward Zone (Right 25%)
         Expanded(
+          flex: 1,
           child: GestureDetector(
             onDoubleTap: () => _seekRelative(const Duration(seconds: 10)),
+            behavior: HitTestBehavior.translucent,
             child: Container(color: Colors.transparent),
           ),
         ),
@@ -325,17 +336,46 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
     );
   }
 
+  Widget _buildCenterControls() {
+    return Center(
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _buildControlButton(
+            icon: Icons.skip_previous_rounded,
+            onPressed: () => controller.playPrevious(),
+          ),
+          const SizedBox(width: 120), // Space for play/pause
+          _buildControlButton(
+            icon: Icons.skip_next_rounded,
+            onPressed: () => controller.playNext(),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildControlButton({
+    required IconData icon,
+    required VoidCallback onPressed,
+  }) {
+    return Container(
+      decoration: BoxDecoration(color: Colors.black38, shape: BoxShape.circle),
+      child: IconButton(
+        icon: Icon(icon, color: Colors.white, size: 30),
+        onPressed: onPressed,
+      ),
+    );
+  }
+
   void _seekRelative(Duration duration) async {
     if (controller.podController == null) return;
-    final vControl =
-        (controller.podController as dynamic).videoPlayerController;
-    if (vControl == null) return;
+    final value = controller.podController!.videoPlayerValue;
+    if (value == null) return;
 
-    final currentPos = vControl.value.position;
+    final currentPos = value.position;
     final newPos = currentPos + duration;
-    await (controller.podController as dynamic).videoPlayerController?.seekTo(
-      newPos,
-    );
+    await controller.podController!.videoSeekTo(newPos);
 
     _showSeekFeedback(duration.inSeconds > 0);
   }

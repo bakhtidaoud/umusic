@@ -6,6 +6,8 @@ import 'package:get/get.dart';
 import 'package:youtube_explode_dart/youtube_explode_dart.dart';
 import '../utils/design_system.dart';
 import '../screens/video_player_screen.dart';
+import '../screens/shorts_screen.dart';
+import '../controllers/home_controller.dart';
 import 'download_quality_sheet.dart';
 
 class VideoCard extends StatefulWidget {
@@ -89,12 +91,21 @@ class _VideoCardState extends State<VideoCard> {
   }
 
   Widget _buildShortCard(BuildContext context) {
+    final homeController = Get.find<HomeController>();
+
     return MouseRegion(
       onEnter: (_) => setState(() => _isHovered = true),
       onExit: (_) => setState(() => _isHovered = false),
       child: GestureDetector(
-        onTap: () =>
-            Get.to(() => VideoPlayerScreen(videoUrl: widget.video.url)),
+        onTap: () {
+          final index = homeController.shorts.indexOf(widget.video);
+          Get.to(
+            () => ShortsScreen(
+              initialShorts: homeController.shorts,
+              startIndex: index >= 0 ? index : 0,
+            ),
+          );
+        },
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 300),
           curve: Curves.easeOutCubic,

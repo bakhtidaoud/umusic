@@ -1,9 +1,10 @@
-import 'package:get/get.dart';
-import 'package:youtube_explode_dart/youtube_explode_dart.dart';
-import 'package:flutter/material.dart';
-import 'package:dio/dio.dart' as dio;
+import 'dart:convert';
 import 'dart:async';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
+import 'package:get/get.dart';
+import 'package:youtube_explode_dart/youtube_explode_dart.dart';
+import 'package:dio/dio.dart' as dio;
 import 'cookie_controller.dart';
 import '../services/geo_service.dart';
 import '../services/extraction_service.dart';
@@ -17,12 +18,16 @@ class HomeController extends GetxController {
   var shorts = <Video>[].obs;
   var isLoading = true.obs;
   var isLoggedIn = false.obs;
-  var currentQuery = 'trending music'.obs;
+  var currentQuery = 'trending'.obs;
   var currentCategory = 'All'.obs;
 
   var suggestions = <String>[].obs;
   var showSuggestions = false.obs;
   var searchText = ''.obs;
+
+  var userName = 'Music Lover'.obs;
+  var userImageUrl = ''.obs;
+  var dynamicCategories = <String>[].obs;
 
   final TextEditingController searchController = TextEditingController();
   Timer? _debounce;
@@ -90,6 +95,12 @@ class HomeController extends GetxController {
     showSuggestions.value = false;
 
     try {
+      // Ensure GeoService is ready
+      final geoService = Get.find<GeoService>();
+      if (geoService.countryCode.value == 'US') {
+        await geoService.loadCachedCountry();
+      }
+
       await checkLoginStatus();
 
       final cookieController = Get.find<CookieController>();
@@ -108,30 +119,25 @@ class HomeController extends GetxController {
 
       List<Video> results = [];
       String finalQuery = currentQuery.value;
-      final geoService = Get.find<GeoService>();
       final country = geoService.countryCode.value;
 
-      // Logic for personalized or trending feed
-      if (finalQuery == 'trending music' && currentCategory.value == 'All') {
-        if (isLoggedIn.value) {
-          // If logged in, we search for generic "music" which often returns personalized results with cookies
-          // or we could try to get their subscription feed if the library supported it.
-          // For now, we search for broad terms that benefit from personalization.
-          final searchResult = await _yt.search.getVideos(
-            'music recommendations',
-            filter: TypeFilters.video,
-          );
-          results = searchResult.toList();
+      // Logic for authentic YouTube Index or specialized search
+      if (finalQuery == 'trending' && currentCategory.value == 'All') {
+        if (isLoggedIn.value && cookies != null) {
+          try {
+            results = await _fetchYouTubeHomeFeed(cookies);
+          } catch (e) {
+            debugPrint('Error fetching home feed: $e');
+            final searchResult = await _yt.search.getVideos(
+              'trending $country',
+            );
+            results = searchResult.toList();
+          }
         } else {
-          // If NOT logged in, get country-specific trending
-          // We'll use search for trending topics which is more reliable across library versions
-          final searchResult = await _yt.search.getVideos(
-            'trending music $country',
-          );
+          final searchResult = await _yt.search.getVideos('trending $country');
           results = searchResult.toList();
         }
       } else {
-        // Normal search or category filter
         String searchQuery = finalQuery;
         if (currentCategory.value != 'All') {
           searchQuery = '${currentCategory.value} $finalQuery';
@@ -140,14 +146,11 @@ class HomeController extends GetxController {
         results = searchResult.toList();
       }
 
-      // Filter Shorts and Regular videos in an isolate for performance
       final categorization = await compute(_categorizeVideos, results);
       var filteredRegular = categorization['regular']!;
       var filteredShorts = categorization['shorts']!;
 
-      // If we didn't get enough shorts from the results, specifically fetch some
-      if (filteredShorts.length < 5 &&
-          (query == null || query == 'trending music')) {
+      if (filteredShorts.length < 5 && (query == null || query == 'trending')) {
         final shortResults = await _yt.search.getVideos(
           isLoggedIn.value
               ? 'shorts recommendations'
@@ -169,8 +172,7 @@ class HomeController extends GetxController {
       videos.assignAll(filteredRegular.take(30));
       shorts.assignAll(filteredShorts.take(15));
 
-      // Persistently cache trending results
-      if (finalQuery == 'trending music' && currentCategory.value == 'All') {
+      if (finalQuery == 'trending' && currentCategory.value == 'All') {
         final cacheService = Get.find<CacheService>();
         await cacheService.cacheSearchResults(
           'trending_$country',
@@ -191,12 +193,122 @@ class HomeController extends GetxController {
 
   void search(String query) {
     searchController.text = query;
-    fetchVideos(query: query.isEmpty ? 'trending music' : query);
+    fetchVideos(query: query.isEmpty ? 'trending' : query);
   }
 
   void setCategory(String category) {
     if (currentCategory.value == category) return;
     fetchVideos(category: category);
+  }
+
+  Future<List<Video>> _fetchYouTubeHomeFeed(String cookies) async {
+    try {
+      final response = await _dio.get(
+        'https://www.youtube.com/',
+        options: dio.Options(
+          headers: {
+            'Cookie': cookies,
+            'User-Agent':
+                'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36',
+          },
+        ),
+      );
+
+      final html = response.data.toString();
+      // More resilient regex for ytInitialData
+      final regex = RegExp(r'(?:var\s+)?ytInitialData\s*=\s*(\{.*?\});');
+      final match = regex.firstMatch(html);
+
+      if (match != null) {
+        final jsonStr = match.group(1);
+        final dynamic data = jsonDecode(jsonStr!);
+
+        // Try to extract user info
+        try {
+          var topbar = data['topbar']?['desktopTopbarRenderer'];
+          var avatar = topbar?['topbarButtons']?[3]?['topbarMenuButtonRenderer']?['avatar']?['thumbnails']?[0]?['url'];
+          
+          // Alternative path for avatar
+          avatar ??= data['responseContext']?['mainAppWebResponseContext']?['loggedOutAvatar']?['thumbnails']?[0]?['url'];
+          
+          if (avatar != null) userImageUrl.value = avatar;
+
+          // Attempt to get name from accessibility data or other fields
+          // Note: Full name is often harder to get silently, but we can try common paths
+          var accountButton = topbar?['topbarButtons']?.firstWhere((b) => b['topbarMenuButtonRenderer'] != null, orElse: () => null);
+          var nameText = accountButton?['topbarMenuButtonRenderer']?['accessibility']?['accessibilityData']?['label'];
+          if (nameText != null && nameText.toString().contains(',')) {
+             // Often "Account profile: Full Name"
+             userName.value = nameText.split(':').last.trim();
+          }
+        } catch (e) {
+          debugPrint('User info extraction error: $e');
+        }
+
+        // Try to extract categories
+        try {
+          var header = data['contents']?['twoColumnBrowseResultsRenderer']?['tabs']?[0]?['tabRenderer']?['content']?['richGridRenderer']?['header']?['feedFilterChipBarRenderer'];
+          if (header != null) {
+            var chips = header['contents'] as List?;
+            if (chips != null) {
+              final newCats = <String>['All'];
+              for (var chip in chips) {
+                var text = chip['chipCloudChipRenderer']?['text']?['simpleText'] ?? 
+                           chip['chipCloudChipRenderer']?['text']?['runs']?[0]?['text'];
+                if (text != null && text != 'All') {
+                  newCats.add(text);
+                }
+              }
+              if (newCats.length > 1) {
+                dynamicCategories.assignAll(newCats);
+              }
+            }
+          }
+        } catch (e) {
+          debugPrint('Categories extraction error: $e');
+        }
+
+        final List<String> videoIds = [];
+
+        try {
+          void traverse(dynamic node) {
+            if (node is Map) {
+              if (node.containsKey('videoId') && node['videoId'] is String) {
+                if (!videoIds.contains(node['videoId'])) {
+                  videoIds.add(node['videoId']);
+                }
+              }
+              node.forEach((_, value) => traverse(value));
+            } else if (node is List) {
+              for (var e in node) {
+                traverse(e);
+              }
+            }
+          }
+
+          traverse(data);
+        } catch (e) {
+          debugPrint('Parsing error: $e');
+        }
+
+        if (videoIds.isNotEmpty) {
+          final List<Video> finalVideos = [];
+          final idsToFetch = videoIds.take(15).toList();
+
+          // Fetch in parallel
+          final futures = idsToFetch.map((id) => _yt.videos.get(id));
+          final results = await Future.wait(futures);
+          finalVideos.addAll(results);
+
+          return finalVideos;
+        }
+      }
+    } catch (e) {
+      debugPrint('Scraping error: $e');
+    }
+
+    final searchResult = await _yt.search.getVideos('recommended videos');
+    return searchResult.toList();
   }
 
   @override
